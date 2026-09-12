@@ -1,5 +1,7 @@
 # ClipEditor
 
+<img src="images/cn.png" alt="ClipEditor 软件界面" width="800">
+
 **Windows 剪贴板文本预处理工具 · A Windows Clipboard Text Preprocessor**
 
 Made by **Alright Peaches Studio**
@@ -299,6 +301,8 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 允许使用、修改、分发和商业使用；分发软件副本或代码的重要部分时，应保留版权及许可声明。软件按原样提供，不作任何担保。第三方组件和资源如附带独立许可证，应遵守其各自条款。
 
 ## English
+
+<img src="images/en.png" alt="ClipEditor Software Interface" width="800">
 
 ### About ClipEditor
 
