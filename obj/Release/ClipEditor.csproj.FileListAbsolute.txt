@@ -1,0 +1,12 @@
+D:\SymMover\projects\CSharpProjects\ClipEditor\bin\Release\ClipEditor.exe
+D:\SymMover\projects\CSharpProjects\ClipEditor\bin\Release\ClipEditor.pdb
+D:\SymMover\projects\CSharpProjects\ClipEditor\bin\Release\EPPlus.dll
+D:\SymMover\projects\CSharpProjects\ClipEditor\bin\Release\EPPlus.xml
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.csproj.AssemblyReference.cache
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.Form1.resources
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.Properties.Resources.resources
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.csproj.GenerateResource.cache
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.csproj.CoreCompileInputs.cache
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.csproj.Up2Date
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.exe
+D:\SymMover\projects\CSharpProjects\ClipEditor\obj\Release\ClipEditor.pdb
