@@ -1,6 +1,6 @@
 # ClipEditor
 
-<img src="images/cn.png" alt="ClipEditor 软件界面" width="800">
+![ClipEditor 简体中文界面](cn.png)
 
 **Windows 剪贴板文本预处理工具 · A Windows Clipboard Text Preprocessor**
 
@@ -302,7 +302,7 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 ## English
 
-<img src="images/en.png" alt="ClipEditor Software Interface" width="800">
+![ClipEditor English interface](en.png)
 
 ### About ClipEditor
 
