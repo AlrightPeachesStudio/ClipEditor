@@ -14,7 +14,7 @@ Made by **Alright Peaches Studio**
 
 ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主要用于在粘贴之前，对剪贴板中的文本进行纯文本提取、编辑和预处理。
 
-从 Word、ChatGPT 网页或其他网站复制内容时，剪贴板中往往同时包含文字和富文本格式。直接粘贴到其他应用中，可能会带入不需要的字体、字号、颜色、背景或其他样式。ClipEditor 读取其中的文本内容，让你先检查和整理，再将结果以纯文本形式复制回剪贴板，方便粘贴到目标应用中。
+从 Word、PDF、ChatGPT 网页或其他网站复制内容时，剪贴板中往往同时包含文字和富文本格式。直接粘贴到其他应用中，可能会带入不需要的字体、字号、颜色、背景或其他样式。ClipEditor 读取其中的文本内容，让你先检查和整理，再将结果以纯文本形式复制回剪贴板，方便粘贴到目标应用中。
 
 除了去除富文本样式，ClipEditor 还提供缩进、空格与换行整理、列表前缀清理、查找替换及临时历史标签等功能，减少逐行修改和反复复制粘贴的工作量。
 
@@ -308,7 +308,7 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 ClipEditor is a Windows desktop application built with C# and Windows Forms for extracting, editing, and preprocessing clipboard text before pasting it into another application.
 
-Content copied from Word, ChatGPT webpages, and other websites can include rich-text formatting alongside the text itself. Pasting it directly may bring unwanted fonts, sizes, colors, backgrounds, or other styles into your destination document.
+Content copied from Word, PDF, ChatGPT webpages, and other websites can include rich-text formatting alongside the text itself. Pasting it directly may bring unwanted fonts, sizes, colors, backgrounds, or other styles into your destination document.
 
 ClipEditor reads the text representation, lets you inspect and prepare it, and writes the result back as plain text when you copy it. The destination application determines how the pasted plain text appears.
 
