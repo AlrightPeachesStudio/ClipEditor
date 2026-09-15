@@ -38,10 +38,13 @@ namespace ClipEditor
         private bool clipboardListenerRegistered;
         private bool changingHistorySelection;
         private bool normalizingEditorLineEndings;
+        private uint programmaticClipboardSequenceNumber;
         private string lastClipboardHistoryText;
         private int nextClipboardHistoryNumber;
         private TabPage hoveredHistoryCloseTab;
         private TabPage pressedHistoryCloseTab;
+        private Button lockedAutomaticProcessingButton;
+        private Func<string, string> lockedAutomaticProcessingAction;
 
         private sealed class ClipboardHistoryEntry
         {
@@ -66,6 +69,9 @@ namespace ClipEditor
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool RemoveClipboardFormatListener(IntPtr windowHandle);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetClipboardSequenceNumber();
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -113,6 +119,7 @@ namespace ClipEditor
             }
 
             ApplyLanguage();
+            UpdateClipboardWatchControlsForProcessingMode();
             InitializeClipboardHistory();
             EnsureClipboardListenerAvailable();
             TryLoadClipboard(
@@ -802,7 +809,6 @@ namespace ClipEditor
         {
             base.WndProc(ref m);
 
-            // 保留原来的剪贴板监听功能。
             if (m.Msg == WmClipboardUpdate &&
                 !this.Disposing &&
                 !this.IsDisposed &&
@@ -811,6 +817,15 @@ namespace ClipEditor
                 liveClipboardRadioButton.Checked &&
                 !initializingPreferences)
             {
+                // Clipboard.SetDataObject/Clipboard.Clear 也会触发 WM_CLIPBOARDUPDATE。
+                // 用系统剪贴板序号准确忽略程序自己的写入，防止自动处理递归执行。
+                uint currentSequenceNumber = GetClipboardSequenceNumber();
+                if (currentSequenceNumber != 0 &&
+                    currentSequenceNumber == programmaticClipboardSequenceNumber)
+                {
+                    return;
+                }
+
                 clipboardUpdateTimer.Stop();
                 clipboardUpdateTimer.Start();
             }
@@ -877,6 +892,13 @@ namespace ClipEditor
                 return;
             }
 
+            if (automaticProcessingModeRadioButton.Checked &&
+                lockedAutomaticProcessingAction != null)
+            {
+                TryAutomaticallyProcessClipboardChange();
+                return;
+            }
+
             TryLoadClipboard(
                 showSuccessMessage: false,
                 clearEditorWhenNoText: true,
@@ -917,6 +939,7 @@ namespace ClipEditor
             try
             {
                 ExecuteClipboardOperation(Clipboard.Clear);
+                RecordProgrammaticClipboardSequence();
                 ShowStatus(Localize("剪贴板已清空", "Clipboard cleared"));
                 textBox1.Focus();
             }
@@ -1067,28 +1090,33 @@ namespace ClipEditor
 
         private void button8_Click(object sender, EventArgs e)
         {
-            SetEditorText(textBox1.Text.Replace(" ", ""));
+            HandleTextProcessingButton(
+                button8,
+                value => value.Replace(" ", ""));
         }
 
         private void button9_Click(object sender, EventArgs e)
         {
-            SetEditorText(CommonListPrefixRegex.Replace(textBox1.Text, string.Empty));
+            HandleTextProcessingButton(
+                button9,
+                value => CommonListPrefixRegex.Replace(value, string.Empty));
         }
 
         private void button10_Click(object sender, EventArgs e)
         {
-            SetEditorText(textBox1.Text.ToUpper());
+            HandleTextProcessingButton(button10, value => value.ToUpper());
         }
 
         private void button11_Click(object sender, EventArgs e)
         {
-            SetEditorText(textBox1.Text.ToLower());
+            HandleTextProcessingButton(button11, value => value.ToLower());
         }
 
         private void button12_Click(object sender, EventArgs e)
         {
-            SetEditorText(
-                textBox1.Text
+            HandleTextProcessingButton(
+                button12,
+                value => value
                     .Replace(" ", "")
                     .Replace("\t", "")
                     .Replace("\n", "")
@@ -1098,37 +1126,53 @@ namespace ClipEditor
 
         private void button13_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text);
+            HandleTextProcessingButton(button13, TransformRemoveLineNumbers);
+        }
+
+        private static string TransformRemoveLineNumbers(string value)
+        {
+            string[] lines = SplitLines(value);
             for (int i = 0; i < lines.Length; i++)
             {
                 lines[i] = Regex.Replace(lines[i], @"^[ \t]*\d+[ \t]+", string.Empty)
                     .TrimStart();
             }
 
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            return string.Join(Environment.NewLine, lines);
         }
 
         private void button14_Click(object sender, EventArgs e)
         {
-            SetEditorText(textBox1.Text.Replace("->", "").Replace(">>>", ""));
+            HandleTextProcessingButton(
+                button14,
+                value => value.Replace("->", "").Replace(">>>", ""));
         }
 
         private void button15_Click(object sender, EventArgs e)
         {
-            System.Globalization.CultureInfo cultureInfo =
-                System.Threading.Thread.CurrentThread.CurrentCulture;
-            System.Globalization.TextInfo textInfo = cultureInfo.TextInfo;
-            SetEditorText(textInfo.ToTitleCase(textBox1.Text));
+            HandleTextProcessingButton(button15, TransformToTitleCase);
+        }
+
+        private static string TransformToTitleCase(string value)
+        {
+            System.Globalization.TextInfo textInfo =
+                Thread.CurrentThread.CurrentCulture.TextInfo;
+            return textInfo.ToTitleCase(value);
         }
 
         private void button16_Click(object sender, EventArgs e)
         {
-            SetEditorText(string.Empty);
+            HandleTextProcessingButton(button16, value => string.Empty);
         }
 
         private void button17_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text)
+            HandleTextProcessingButton(button17, TransformAddLineNumbers);
+        }
+
+        private static string TransformAddLineNumbers(string value)
+        {
+            string[] lines = SplitLines(value)
                 .Where(line => !string.IsNullOrWhiteSpace(line))
                 .ToArray();
 
@@ -1137,23 +1181,33 @@ namespace ClipEditor
                 lines[i] = (i + 1) + ". " + lines[i];
             }
 
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            return string.Join(Environment.NewLine, lines);
         }
 
         private void button18_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text);
+            HandleTextProcessingButton(button18, TransformTrimLineStarts);
+        }
+
+        private static string TransformTrimLineStarts(string value)
+        {
+            string[] lines = SplitLines(value);
             for (int i = 0; i < lines.Length; i++)
             {
                 lines[i] = lines[i].TrimStart();
             }
 
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            return string.Join(Environment.NewLine, lines);
         }
 
         private void button19_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text);
+            HandleTextProcessingButton(button19, TransformRemoveLeadingDashes);
+        }
+
+        private static string TransformRemoveLeadingDashes(string value)
+        {
+            string[] lines = SplitLines(value);
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -1166,20 +1220,23 @@ namespace ClipEditor
                 lines[i] = line;
             }
 
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            return string.Join(Environment.NewLine, lines);
         }
 
         private void button20_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text)
-                .Where(line => !string.IsNullOrWhiteSpace(line))
-                .ToArray();
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            HandleTextProcessingButton(
+                button20,
+                value => string.Join(
+                    Environment.NewLine,
+                    SplitLines(value)
+                        .Where(line => !string.IsNullOrWhiteSpace(line))
+                        .ToArray()));
         }
 
         private void button21_Click(object sender, EventArgs e)
         {
-            SetEditorText(RemoveNumberedTitles(textBox1.Text));
+            HandleTextProcessingButton(button21, RemoveNumberedTitles);
         }
 
         private static string RemoveNumberedTitles(string input)
@@ -1191,7 +1248,7 @@ namespace ClipEditor
 
         private void button22_Click(object sender, EventArgs e)
         {
-            SetEditorText(RemoveLeadingDot(textBox1.Text));
+            HandleTextProcessingButton(button22, RemoveLeadingDot);
         }
 
         public static string RemoveLeadingDot(string input)
@@ -1207,7 +1264,12 @@ namespace ClipEditor
 
         private void button23_Click(object sender, EventArgs e)
         {
-            string[] lines = SplitLines(textBox1.Text);
+            HandleTextProcessingButton(button23, TransformJoinParagraphLines);
+        }
+
+        private static string TransformJoinParagraphLines(string value)
+        {
+            string[] lines = SplitLines(value);
             List<string> outputLines = new List<string>();
             StringBuilder paragraph = new StringBuilder();
 
@@ -1230,7 +1292,7 @@ namespace ClipEditor
             }
 
             FlushParagraph(outputLines, paragraph);
-            SetEditorText(string.Join(Environment.NewLine, outputLines));
+            return string.Join(Environment.NewLine, outputLines);
         }
 
         private void buttonIndent2_Click(object sender, EventArgs e)
@@ -1255,13 +1317,22 @@ namespace ClipEditor
 
         private void AddLeadingSpaces(int count)
         {
-            if (count <= 0)
-            {
-                return;
-            }
+            Button button = count == 2
+                ? buttonIndent2
+                : count == 4
+                    ? buttonIndent4
+                    : count == 8
+                        ? buttonIndent8
+                        : buttonIndent12;
+            HandleTextProcessingButton(
+                button,
+                value => TransformAddLeadingSpaces(value, count));
+        }
 
+        private static string TransformAddLeadingSpaces(string value, int count)
+        {
             string prefix = new string(' ', count);
-            string[] lines = SplitLines(textBox1.Text);
+            string[] lines = SplitLines(value);
             for (int i = 0; i < lines.Length; i++)
             {
                 // 空行保持为空，避免产生肉眼不可见但实际存在的尾随空格。
@@ -1271,7 +1342,98 @@ namespace ClipEditor
                 }
             }
 
-            SetEditorText(string.Join(Environment.NewLine, lines));
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private void HandleTextProcessingButton(
+            Button button,
+            Func<string, string> processingAction)
+        {
+            if (automaticProcessingModeRadioButton.Checked)
+            {
+                LockAutomaticProcessingAction(button, processingAction);
+                return;
+            }
+
+            SetEditorText(processingAction(textBox1.Text));
+        }
+
+        private void LockAutomaticProcessingAction(
+            Button button,
+            Func<string, string> processingAction)
+        {
+            if (button == null || processingAction == null)
+            {
+                return;
+            }
+
+            Button previousButton = lockedAutomaticProcessingButton;
+            lockedAutomaticProcessingButton = button;
+            lockedAutomaticProcessingAction = processingAction;
+
+            if (previousButton != null &&
+                !ReferenceEquals(previousButton, button))
+            {
+                SetAutomaticProcessingButtonAppearance(previousButton, false);
+                toolTip1.SetToolTip(previousButton, previousButton.Text);
+            }
+
+            SetAutomaticProcessingButtonAppearance(button, true);
+            toolTip1.SetToolTip(
+                button,
+                Localize(
+                    "已锁定为自动处理操作；复制新文本时会自动执行此操作",
+                    "Locked as the automatic action; it runs whenever new text is copied"));
+            ShowStatus(
+                Localize("自动处理已锁定：", "Automatic action locked: ") +
+                button.Text);
+        }
+
+        private void ClearAutomaticProcessingAction()
+        {
+            if (lockedAutomaticProcessingButton != null)
+            {
+                SetAutomaticProcessingButtonAppearance(
+                    lockedAutomaticProcessingButton,
+                    false);
+                toolTip1.SetToolTip(
+                    lockedAutomaticProcessingButton,
+                    lockedAutomaticProcessingButton.Text);
+            }
+
+            lockedAutomaticProcessingButton = null;
+            lockedAutomaticProcessingAction = null;
+        }
+
+        private void SetAutomaticProcessingButtonAppearance(
+            Button button,
+            bool locked)
+        {
+            if (locked)
+            {
+                if (!button.Text.StartsWith("🔒 ", StringComparison.Ordinal))
+                {
+                    button.Text = "🔒 " + button.Text;
+                }
+
+                button.UseVisualStyleBackColor = false;
+                button.FlatStyle = FlatStyle.Flat;
+                button.BackColor = Color.FromArgb(218, 90, 55);
+                button.ForeColor = Color.White;
+                button.FlatAppearance.BorderColor = Color.FromArgb(151, 52, 28);
+                button.FlatAppearance.BorderSize = 2;
+                return;
+            }
+
+            if (button.Text.StartsWith("🔒 ", StringComparison.Ordinal))
+            {
+                button.Text = button.Text.Substring(3);
+            }
+
+            button.FlatStyle = FlatStyle.Standard;
+            button.UseVisualStyleBackColor = true;
+            button.BackColor = SystemColors.Control;
+            button.ForeColor = SystemColors.ControlText;
         }
 
         private void buttonLanguage_Click(object sender, EventArgs e)
@@ -1293,14 +1455,63 @@ namespace ClipEditor
             }
         }
 
-        private void DirectClipboardModeRadioButton_CheckedChanged(
+        private void ProcessingModeRadioButton_CheckedChanged(
             object sender,
             EventArgs e)
         {
-            if (initializingPreferences)
+            RadioButton selectedMode = sender as RadioButton;
+            if (initializingPreferences ||
+                selectedMode == null ||
+                !selectedMode.Checked)
             {
                 return;
             }
+
+            if (automaticProcessingModeRadioButton.Checked)
+            {
+                if (!clipboardListenerRegistered)
+                {
+                    initializingPreferences = true;
+                    try
+                    {
+                        automaticProcessingModeRadioButton.Checked = false;
+                        regularModeRadioButton.Checked = true;
+                    }
+                    finally
+                    {
+                        initializingPreferences = false;
+                    }
+
+                    UpdateClipboardWatchControlsForProcessingMode();
+                    SaveModePreference();
+                    ShowClipboardListenerUnavailableMessage();
+                    return;
+                }
+
+                initializingPreferences = true;
+                try
+                {
+                    liveClipboardRadioButton.Checked = true;
+                    startupClipboardRadioButton.Checked = false;
+                }
+                finally
+                {
+                    initializingPreferences = false;
+                }
+
+                SaveClipboardWatchPreference();
+                TryLoadClipboard(
+                    showSuccessMessage: false,
+                    clearEditorWhenNoText: true,
+                    showErrorMessages: false,
+                    focusEditor: false);
+            }
+            else
+            {
+                ClearAutomaticProcessingAction();
+            }
+
+            UpdateClipboardWatchControlsForProcessingMode();
 
             if (!SaveModePreference())
             {
@@ -1316,13 +1527,24 @@ namespace ClipEditor
             }
 
             ShowStatus(
-                directClipboardModeRadioButton.Checked
+                automaticProcessingModeRadioButton.Checked
+                    ? Localize(
+                        "已切换为自动处理模式；请选择并锁定一个文本处理按钮",
+                        "Automatic processing selected; choose a text-processing button to lock")
+                    : directClipboardModeRadioButton.Checked
                     ? Localize(
                         "已切换为直接修改剪贴板模式",
                         "Direct clipboard mode selected")
                     : Localize(
                         "已切换为常规模式",
                         "Normal mode selected"));
+        }
+
+        private void UpdateClipboardWatchControlsForProcessingMode()
+        {
+            bool monitoringIsForced = automaticProcessingModeRadioButton.Checked;
+            startupClipboardRadioButton.Enabled = !monitoringIsForced;
+            liveClipboardRadioButton.Enabled = !monitoringIsForced;
         }
 
         private void LiveClipboardRadioButton_CheckedChanged(
@@ -1487,6 +1709,87 @@ namespace ClipEditor
             }
         }
 
+        private void TryAutomaticallyProcessClipboardChange()
+        {
+            Func<string, string> processingAction =
+                lockedAutomaticProcessingAction;
+            Button processingButton = lockedAutomaticProcessingButton;
+            if (processingAction == null || processingButton == null)
+            {
+                return;
+            }
+
+            try
+            {
+                uint sourceSequenceNumber = GetClipboardSequenceNumber();
+                if (sourceSequenceNumber != 0 &&
+                    sourceSequenceNumber == programmaticClipboardSequenceNumber)
+                {
+                    return;
+                }
+
+                string clipboardText = ExecuteClipboardOperation(
+                    () => Clipboard.ContainsText()
+                        ? Clipboard.GetText(TextDataFormat.UnicodeText)
+                        : null);
+
+                if (clipboardText == null)
+                {
+                    LoadClipboardTextIntoHistory(
+                        string.Empty,
+                        forceDisplay: false);
+                    return;
+                }
+
+                string sourceText = NormalizeLineEndings(clipboardText);
+                string processedText = NormalizeLineEndings(
+                    processingAction(sourceText));
+
+                LoadClipboardTextIntoHistory(
+                    processedText,
+                    forceDisplay: true);
+
+                if (!string.Equals(
+                    sourceText,
+                    processedText,
+                    StringComparison.Ordinal))
+                {
+                    ExecuteClipboardOperation(
+                        () =>
+                        {
+                            if (processedText.Length == 0)
+                            {
+                                Clipboard.Clear();
+                            }
+                            else
+                            {
+                                Clipboard.SetDataObject(processedText, true);
+                            }
+                        });
+                    RecordProgrammaticClipboardSequence();
+                }
+
+                ShowStatus(
+                    Localize("已自动处理并写回剪贴板：", "Automatically processed and copied: ") +
+                    processingButton.Text);
+            }
+            catch (ExternalException)
+            {
+                // 实时监听期间不弹出窗口打断用户，下次剪贴板变化时会自动重试。
+                ShowStatus(
+                    Localize(
+                        "自动处理失败：剪贴板暂时被占用",
+                        "Automatic processing failed: clipboard is temporarily busy"));
+            }
+            catch (ThreadStateException)
+            {
+                ShowStatus(
+                    Localize(
+                        "自动处理失败：当前线程无法访问剪贴板",
+                        "Automatic processing failed: this thread cannot access the clipboard"));
+            }
+        }
+
         private bool TryCopyToClipboard(string value, string successMessage)
         {
             if (string.IsNullOrEmpty(value))
@@ -1506,6 +1809,7 @@ namespace ClipEditor
             try
             {
                 ExecuteClipboardOperation(() => Clipboard.SetDataObject(value, true));
+                RecordProgrammaticClipboardSequence();
 
                 ShowStatus(successMessage);
                 textBox1.Focus();
@@ -1573,6 +1877,12 @@ namespace ClipEditor
             try
             {
                 startupClipboardRadioButton.Checked = true;
+                if (automaticProcessingModeRadioButton.Checked)
+                {
+                    automaticProcessingModeRadioButton.Checked = false;
+                    regularModeRadioButton.Checked = true;
+                    ClearAutomaticProcessingAction();
+                }
             }
             finally
             {
@@ -1580,6 +1890,8 @@ namespace ClipEditor
             }
 
             SaveClipboardWatchPreference();
+            SaveModePreference();
+            UpdateClipboardWatchControlsForProcessingMode();
             ShowClipboardListenerUnavailableMessage();
         }
 
@@ -1668,6 +1980,7 @@ namespace ClipEditor
                             Clipboard.SetDataObject(value, true);
                         }
                     });
+                RecordProgrammaticClipboardSequence();
 
                 ShowStatus(
                     string.IsNullOrEmpty(value)
@@ -1689,6 +2002,11 @@ namespace ClipEditor
                 ShowStaThreadMessage();
                 return false;
             }
+        }
+
+        private void RecordProgrammaticClipboardSequence()
+        {
+            programmaticClipboardSequenceNumber = GetClipboardSequenceNumber();
         }
 
         private string Localize(string chineseText, string englishText)
@@ -1721,6 +2039,9 @@ namespace ClipEditor
             directClipboardModeRadioButton.Text = Localize(
                 "直接修改剪贴板（处理后自动复制进剪切板）",
                 "Direct clipboard (auto-copy after processing)");
+            automaticProcessingModeRadioButton.Text = Localize(
+                "自动处理（复制后按锁定操作自动处理）",
+                "Automatic (process every newly copied text)");
 
             clipboardWatchGroupBox.Text = Localize(
                 "剪贴板监听模式",
@@ -1769,6 +2090,18 @@ namespace ClipEditor
 
             RefreshHistoryTabTitles();
             SetToolTips();
+            if (lockedAutomaticProcessingButton != null)
+            {
+                SetAutomaticProcessingButtonAppearance(
+                    lockedAutomaticProcessingButton,
+                    true);
+                toolTip1.SetToolTip(
+                    lockedAutomaticProcessingButton,
+                    Localize(
+                        "已锁定为自动处理操作；复制新文本时会自动执行此操作",
+                        "Locked as the automatic action; it runs whenever new text is copied"));
+            }
+
             UpdateTextStatistics();
         }
 
@@ -1792,6 +2125,11 @@ namespace ClipEditor
                 Localize(
                     "每次执行文本处理后，自动把完整结果写入剪贴板",
                     "Write the full result to the clipboard after each processing action"));
+            toolTip1.SetToolTip(
+                automaticProcessingModeRadioButton,
+                Localize(
+                    "自动启用实时监听；点击一个文本处理按钮将其锁定，之后复制的文本会自动处理并写回剪贴板",
+                    "Force live monitoring; lock one text-processing button to process and replace every newly copied text"));
             toolTip1.SetToolTip(
                 startupClipboardRadioButton,
                 Localize(
@@ -1893,6 +2231,7 @@ namespace ClipEditor
         private void LoadModePreference()
         {
             bool useDirectClipboardMode = false;
+            bool useAutomaticProcessingMode = false;
 
             try
             {
@@ -1905,16 +2244,24 @@ namespace ClipEditor
                         value,
                         "direct",
                         StringComparison.OrdinalIgnoreCase);
+                    useAutomaticProcessingMode = string.Equals(
+                        value,
+                        "automatic",
+                        StringComparison.OrdinalIgnoreCase);
                 }
             }
             catch (Exception)
             {
                 // 注册表不可读时回退到常规模式，不影响程序启动。
                 useDirectClipboardMode = false;
+                useAutomaticProcessingMode = false;
             }
 
             directClipboardModeRadioButton.Checked = useDirectClipboardMode;
-            regularModeRadioButton.Checked = !useDirectClipboardMode;
+            automaticProcessingModeRadioButton.Checked =
+                useAutomaticProcessingMode;
+            regularModeRadioButton.Checked =
+                !useDirectClipboardMode && !useAutomaticProcessingMode;
         }
 
         private bool SaveModePreference()
@@ -1930,9 +2277,11 @@ namespace ClipEditor
 
                     key.SetValue(
                         RegistryModeValueName,
-                        directClipboardModeRadioButton.Checked
-                            ? "direct"
-                            : "normal",
+                        automaticProcessingModeRadioButton.Checked
+                            ? "automatic"
+                            : directClipboardModeRadioButton.Checked
+                                ? "direct"
+                                : "normal",
                         RegistryValueKind.String);
                 }
 
@@ -1965,6 +2314,11 @@ namespace ClipEditor
             {
                 // 注册表不可读时回退到仅启动时导入模式。
                 useLiveMonitoring = false;
+            }
+
+            if (automaticProcessingModeRadioButton.Checked)
+            {
+                useLiveMonitoring = true;
             }
 
             liveClipboardRadioButton.Checked = useLiveMonitoring;

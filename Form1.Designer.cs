@@ -42,6 +42,7 @@
             this.modeLayout = new System.Windows.Forms.FlowLayoutPanel();
             this.regularModeRadioButton = new System.Windows.Forms.RadioButton();
             this.directClipboardModeRadioButton = new System.Windows.Forms.RadioButton();
+            this.automaticProcessingModeRadioButton = new System.Windows.Forms.RadioButton();
             this.clipboardWatchGroupBox = new System.Windows.Forms.GroupBox();
             this.clipboardWatchLayout = new System.Windows.Forms.FlowLayoutPanel();
             this.startupClipboardRadioButton = new System.Windows.Forms.RadioButton();
@@ -277,6 +278,7 @@
                 System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.modeLayout.Controls.Add(this.regularModeRadioButton);
             this.modeLayout.Controls.Add(this.directClipboardModeRadioButton);
+            this.modeLayout.Controls.Add(this.automaticProcessingModeRadioButton);
             this.modeLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this.modeLayout.Margin = new System.Windows.Forms.Padding(0);
             this.modeLayout.Name = "modeLayout";
@@ -293,6 +295,9 @@
             this.regularModeRadioButton.TabStop = true;
             this.regularModeRadioButton.Text = "常规模式（手动复制或点击下方按钮复制）";
             this.regularModeRadioButton.UseVisualStyleBackColor = true;
+            this.regularModeRadioButton.CheckedChanged +=
+                new System.EventHandler(
+                    this.ProcessingModeRadioButton_CheckedChanged);
             // 
             // directClipboardModeRadioButton
             // 
@@ -307,7 +312,22 @@
             this.directClipboardModeRadioButton.UseVisualStyleBackColor = true;
             this.directClipboardModeRadioButton.CheckedChanged +=
                 new System.EventHandler(
-                    this.DirectClipboardModeRadioButton_CheckedChanged);
+                    this.ProcessingModeRadioButton_CheckedChanged);
+            // 
+            // automaticProcessingModeRadioButton
+            // 
+            this.automaticProcessingModeRadioButton.AutoSize = true;
+            this.automaticProcessingModeRadioButton.Margin =
+                new System.Windows.Forms.Padding(8, 1, 0, 1);
+            this.automaticProcessingModeRadioButton.Name =
+                "automaticProcessingModeRadioButton";
+            this.automaticProcessingModeRadioButton.TabIndex = 2;
+            this.automaticProcessingModeRadioButton.Text =
+                "自动处理（复制后按锁定操作自动处理）";
+            this.automaticProcessingModeRadioButton.UseVisualStyleBackColor = true;
+            this.automaticProcessingModeRadioButton.CheckedChanged +=
+                new System.EventHandler(
+                    this.ProcessingModeRadioButton_CheckedChanged);
             // 
             // clipboardWatchGroupBox
             // 
@@ -941,6 +961,7 @@
         private System.Windows.Forms.FlowLayoutPanel modeLayout;
         private System.Windows.Forms.RadioButton regularModeRadioButton;
         private System.Windows.Forms.RadioButton directClipboardModeRadioButton;
+        private System.Windows.Forms.RadioButton automaticProcessingModeRadioButton;
         private System.Windows.Forms.GroupBox clipboardWatchGroupBox;
         private System.Windows.Forms.FlowLayoutPanel clipboardWatchLayout;
         private System.Windows.Forms.RadioButton startupClipboardRadioButton;
