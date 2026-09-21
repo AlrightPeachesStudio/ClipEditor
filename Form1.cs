@@ -43,8 +43,24 @@ namespace ClipEditor
         private int nextClipboardHistoryNumber;
         private TabPage hoveredHistoryCloseTab;
         private TabPage pressedHistoryCloseTab;
-        private Button lockedAutomaticProcessingButton;
-        private Func<string, string> lockedAutomaticProcessingAction;
+        private readonly List<AutomaticProcessingStep>
+            lockedAutomaticProcessingSteps =
+                new List<AutomaticProcessingStep>();
+
+        private sealed class AutomaticProcessingStep
+        {
+            public AutomaticProcessingStep(
+                Button button,
+                Func<string, string> processingAction)
+            {
+                Button = button;
+                ProcessingAction = processingAction;
+            }
+
+            public Button Button { get; private set; }
+
+            public Func<string, string> ProcessingAction { get; private set; }
+        }
 
         private sealed class ClipboardHistoryEntry
         {
@@ -893,7 +909,7 @@ namespace ClipEditor
             }
 
             if (automaticProcessingModeRadioButton.Checked &&
-                lockedAutomaticProcessingAction != null)
+                lockedAutomaticProcessingSteps.Count > 0)
             {
                 TryAutomaticallyProcessClipboardChange();
                 return;
@@ -955,6 +971,13 @@ namespace ClipEditor
 
         private void Button6_Click(object sender, EventArgs e)
         {
+            if (automaticProcessingModeRadioButton.Checked &&
+                IsAutomaticProcessingButtonLocked(button6))
+            {
+                ToggleAutomaticProcessingAction(button6, null);
+                return;
+            }
+
             string oldValue;
             if (!TryGetReplacementValues(out oldValue))
             {
@@ -973,7 +996,7 @@ namespace ClipEditor
                 // 锁定当前配置，之后修改输入框不会悄悄改变已锁定的操作。
                 string lockedFindText = oldValue;
                 string lockedReplacementText = newValue;
-                LockAutomaticProcessingAction(
+                ToggleAutomaticProcessingAction(
                     button6,
                     value => value.Replace(
                         lockedFindText,
@@ -1426,58 +1449,112 @@ namespace ClipEditor
         {
             if (automaticProcessingModeRadioButton.Checked)
             {
-                LockAutomaticProcessingAction(button, processingAction);
+                ToggleAutomaticProcessingAction(button, processingAction);
                 return;
             }
 
             SetEditorText(processingAction(textBox1.Text));
         }
 
-        private void LockAutomaticProcessingAction(
+        private void ToggleAutomaticProcessingAction(
             Button button,
             Func<string, string> processingAction)
         {
-            if (button == null || processingAction == null)
+            if (button == null)
             {
                 return;
             }
 
-            Button previousButton = lockedAutomaticProcessingButton;
-            lockedAutomaticProcessingButton = button;
-            lockedAutomaticProcessingAction = processingAction;
+            AutomaticProcessingStep existingStep =
+                FindAutomaticProcessingStep(button);
+            string buttonName = GetAutomaticProcessingButtonName(button);
 
-            if (previousButton != null &&
-                !ReferenceEquals(previousButton, button))
+            if (existingStep != null)
             {
-                SetAutomaticProcessingButtonAppearance(previousButton, false);
-                toolTip1.SetToolTip(previousButton, previousButton.Text);
+                lockedAutomaticProcessingSteps.Remove(existingStep);
+                SetAutomaticProcessingButtonAppearance(button, false);
+                RefreshLockedAutomaticProcessingButtons();
+                ShowStatus(
+                    Localize(
+                        "已从自动处理步骤中解锁：",
+                        "Removed from automatic steps: ") +
+                    buttonName +
+                    Localize(
+                        "；剩余步骤数：",
+                        "; remaining steps: ") +
+                    lockedAutomaticProcessingSteps.Count);
+                return;
             }
 
-            SetAutomaticProcessingButtonAppearance(button, true);
-            toolTip1.SetToolTip(
-                button,
-                Localize(
-                    "已锁定为自动处理操作；复制新文本时会自动执行此操作",
-                    "Locked as the automatic action; it runs whenever new text is copied"));
+            if (processingAction == null)
+            {
+                return;
+            }
+
+            lockedAutomaticProcessingSteps.Add(
+                new AutomaticProcessingStep(button, processingAction));
+            RefreshLockedAutomaticProcessingButtons();
             ShowStatus(
-                Localize("自动处理已锁定：", "Automatic action locked: ") +
-                button.Text);
+                Localize("已锁定为自动处理第 ", "Locked as automatic step ") +
+                lockedAutomaticProcessingSteps.Count +
+                Localize(" 步：", ": ") +
+                buttonName);
         }
 
-        private void ClearAutomaticProcessingAction()
+        private AutomaticProcessingStep FindAutomaticProcessingStep(
+            Button button)
         {
-            if (lockedAutomaticProcessingButton != null)
+            return lockedAutomaticProcessingSteps.FirstOrDefault(
+                step => ReferenceEquals(step.Button, button));
+        }
+
+        private bool IsAutomaticProcessingButtonLocked(Button button)
+        {
+            return FindAutomaticProcessingStep(button) != null;
+        }
+
+        private static string GetAutomaticProcessingButtonName(Button button)
+        {
+            if (button == null)
             {
-                SetAutomaticProcessingButtonAppearance(
-                    lockedAutomaticProcessingButton,
-                    false);
-                toolTip1.SetToolTip(
-                    lockedAutomaticProcessingButton,
-                    lockedAutomaticProcessingButton.Text);
+                return string.Empty;
             }
 
-            lockedAutomaticProcessingButton = null;
-            lockedAutomaticProcessingAction = null;
+            return button.Text.StartsWith("🔒 ", StringComparison.Ordinal)
+                ? button.Text.Substring(3)
+                : button.Text;
+        }
+
+        private void RefreshLockedAutomaticProcessingButtons()
+        {
+            SetToolTips();
+            for (int index = 0;
+                index < lockedAutomaticProcessingSteps.Count;
+                index++)
+            {
+                AutomaticProcessingStep step =
+                    lockedAutomaticProcessingSteps[index];
+                SetAutomaticProcessingButtonAppearance(step.Button, true);
+                toolTip1.SetToolTip(
+                    step.Button,
+                    Localize("自动处理第 ", "Automatic step ") +
+                    (index + 1) +
+                    Localize(
+                        " 步；再次点击可解锁",
+                        "; click again to unlock"));
+            }
+        }
+
+        private void ClearAutomaticProcessingActions()
+        {
+            foreach (AutomaticProcessingStep step in
+                lockedAutomaticProcessingSteps)
+            {
+                SetAutomaticProcessingButtonAppearance(step.Button, false);
+            }
+
+            lockedAutomaticProcessingSteps.Clear();
+            SetToolTips();
         }
 
         private void SetAutomaticProcessingButtonAppearance(
@@ -1583,7 +1660,7 @@ namespace ClipEditor
             }
             else
             {
-                ClearAutomaticProcessingAction();
+                ClearAutomaticProcessingActions();
             }
 
             UpdateClipboardWatchControlsForProcessingMode();
@@ -1604,8 +1681,8 @@ namespace ClipEditor
             ShowStatus(
                 automaticProcessingModeRadioButton.Checked
                     ? Localize(
-                        "已切换为自动处理模式；请选择一个文本处理按钮或“全部替换”进行锁定",
-                        "Automatic processing selected; choose a text-processing button or Replace all to lock")
+                        "已切换为自动处理模式；可按执行顺序锁定多个文本处理按钮和“全部替换”",
+                        "Automatic processing selected; lock multiple actions in the order they should run")
                     : directClipboardModeRadioButton.Checked
                     ? Localize(
                         "已切换为直接修改剪贴板模式",
@@ -1786,10 +1863,9 @@ namespace ClipEditor
 
         private void TryAutomaticallyProcessClipboardChange()
         {
-            Func<string, string> processingAction =
-                lockedAutomaticProcessingAction;
-            Button processingButton = lockedAutomaticProcessingButton;
-            if (processingAction == null || processingButton == null)
+            AutomaticProcessingStep[] processingSteps =
+                lockedAutomaticProcessingSteps.ToArray();
+            if (processingSteps.Length == 0)
             {
                 return;
             }
@@ -1817,8 +1893,12 @@ namespace ClipEditor
                 }
 
                 string sourceText = NormalizeLineEndings(clipboardText);
-                string processedText = NormalizeLineEndings(
-                    processingAction(sourceText));
+                string processedText = sourceText;
+                foreach (AutomaticProcessingStep step in processingSteps)
+                {
+                    processedText = NormalizeLineEndings(
+                        step.ProcessingAction(processedText));
+                }
 
                 LoadClipboardTextIntoHistory(
                     processedText,
@@ -1853,7 +1933,12 @@ namespace ClipEditor
                         : Localize(
                             "剪贴板内容无需更改：",
                             "No clipboard changes needed: ")) +
-                    processingButton.Text);
+                    string.Join(
+                        " → ",
+                        processingSteps
+                            .Select(step =>
+                                GetAutomaticProcessingButtonName(step.Button))
+                            .ToArray()));
             }
             catch (ExternalException)
             {
@@ -1963,7 +2048,7 @@ namespace ClipEditor
                 {
                     automaticProcessingModeRadioButton.Checked = false;
                     regularModeRadioButton.Checked = true;
-                    ClearAutomaticProcessingAction();
+                    ClearAutomaticProcessingActions();
                 }
             }
             finally
@@ -2122,8 +2207,8 @@ namespace ClipEditor
                 "直接修改剪贴板（处理后自动复制进剪切板）",
                 "Direct clipboard (auto-copy after processing)");
             automaticProcessingModeRadioButton.Text = Localize(
-                "自动处理（复制后按锁定操作自动处理）",
-                "Automatic (process every newly copied text)");
+                "自动处理（按锁定顺序执行多个操作）",
+                "Automatic (run multiple locked actions in order)");
 
             clipboardWatchGroupBox.Text = Localize(
                 "剪贴板监听模式",
@@ -2172,18 +2257,7 @@ namespace ClipEditor
             button16.Text = Localize("清空文本", "Clear editor");
 
             RefreshHistoryTabTitles();
-            SetToolTips();
-            if (lockedAutomaticProcessingButton != null)
-            {
-                SetAutomaticProcessingButtonAppearance(
-                    lockedAutomaticProcessingButton,
-                    true);
-                toolTip1.SetToolTip(
-                    lockedAutomaticProcessingButton,
-                    Localize(
-                        "已锁定为自动处理操作；复制新文本时会自动执行此操作",
-                        "Locked as the automatic action; it runs whenever new text is copied"));
-            }
+            RefreshLockedAutomaticProcessingButtons();
 
             UpdateTextStatistics();
         }
@@ -2211,8 +2285,8 @@ namespace ClipEditor
             toolTip1.SetToolTip(
                 automaticProcessingModeRadioButton,
                 Localize(
-                    "自动启用实时监听；点击一个文本处理按钮或“全部替换”将其锁定，之后复制的文本会自动处理并写回剪贴板",
-                    "Force live monitoring; lock a text-processing button or Replace all to process every newly copied text"));
+                    "自动启用实时监听；按所需执行顺序点击多个按钮进行锁定，再次点击可解锁；全部处理完成后写回剪贴板",
+                    "Force live monitoring; click actions in execution order to lock them, click again to unlock, then write the final result to the clipboard"));
             toolTip1.SetToolTip(
                 startupClipboardRadioButton,
                 Localize(
@@ -2236,8 +2310,8 @@ namespace ClipEditor
             toolTip1.SetToolTip(
                 button6,
                 Localize(
-                    "替换所有匹配项；在自动处理模式中点击可锁定此替换规则",
-                    "Replace all matches; in Automatic mode, click to lock this replacement rule"));
+                    "替换所有匹配项；自动处理模式中点击可锁定当前替换规则，再次点击可解锁",
+                    "Replace all matches; in Automatic mode, click to lock the current rule and click again to unlock"));
             toolTip1.SetToolTip(
                 historyTabControl,
                 Localize(

@@ -324,7 +324,7 @@
                 "automaticProcessingModeRadioButton";
             this.automaticProcessingModeRadioButton.TabIndex = 2;
             this.automaticProcessingModeRadioButton.Text =
-                "自动处理（复制后按锁定操作自动处理）";
+                "自动处理（按锁定顺序执行多个操作）";
             this.automaticProcessingModeRadioButton.UseVisualStyleBackColor = true;
             this.automaticProcessingModeRadioButton.CheckedChanged +=
                 new System.EventHandler(
