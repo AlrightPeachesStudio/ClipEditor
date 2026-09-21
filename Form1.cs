@@ -955,18 +955,29 @@ namespace ClipEditor
 
         private void Button6_Click(object sender, EventArgs e)
         {
-            string oldValue = textBox2.Text;
-            if (string.IsNullOrEmpty(oldValue))
+            string oldValue;
+            if (!TryGetReplacementValues(out oldValue))
             {
-                MessageBox.Show(
-                    this,
-                    Localize(
-                        "要被替换的内容不能为空。",
-                        "The text to find cannot be empty."),
-                    Localize("无法替换", "Cannot replace"),
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                textBox2.Focus();
+                return;
+            }
+
+            string newValue = textBox3.Text ?? string.Empty;
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                ShowReplacementTextUnchangedMessage();
+                return;
+            }
+
+            if (automaticProcessingModeRadioButton.Checked)
+            {
+                // 锁定当前配置，之后修改输入框不会悄悄改变已锁定的操作。
+                string lockedFindText = oldValue;
+                string lockedReplacementText = newValue;
+                LockAutomaticProcessingAction(
+                    button6,
+                    value => value.Replace(
+                        lockedFindText,
+                        lockedReplacementText));
                 return;
             }
 
@@ -985,24 +996,82 @@ namespace ClipEditor
                 return;
             }
 
-            if (string.Equals(oldValue, textBox3.Text, StringComparison.Ordinal))
-            {
-                MessageBox.Show(
-                    this,
-                    Localize(
-                        "替换前后的内容相同，文本未发生变化。",
-                        "The find and replacement text are identical."),
-                    Localize("文本未变化", "Text unchanged"),
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                textBox1.Focus();
-                return;
-            }
-
-            SetEditorText(textBox1.Text.Replace(oldValue, textBox3.Text));
+            SetEditorText(textBox1.Text.Replace(oldValue, newValue));
             ShowStatus(
                 Localize("已替换 ", "Replaced ") + replacementCount +
                 Localize(" 处内容", " occurrence(s)"));
+            textBox1.Focus();
+        }
+
+        private void ButtonReplaceCurrent_Click(object sender, EventArgs e)
+        {
+            string oldValue;
+            if (!TryGetReplacementValues(out oldValue))
+            {
+                return;
+            }
+
+            string newValue = textBox3.Text ?? string.Empty;
+            if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                ShowReplacementTextUnchangedMessage();
+                return;
+            }
+
+            bool currentSelectionMatches =
+                textBox1.SelectionLength == oldValue.Length &&
+                string.Equals(
+                    textBox1.SelectedText,
+                    oldValue,
+                    StringComparison.CurrentCultureIgnoreCase);
+
+            if (!currentSelectionMatches && !TrySelectNextOccurrence())
+            {
+                return;
+            }
+
+            int matchStart = textBox1.SelectionStart;
+            string replacedText = textBox1.Text
+                .Remove(matchStart, oldValue.Length)
+                .Insert(matchStart, newValue);
+
+            SetEditorText(replacedText, preserveSelection: false);
+            textBox1.Focus();
+            textBox1.Select(matchStart, newValue.Length);
+            textBox1.ScrollToCaret();
+            ShowStatus(Localize("已替换当前匹配项", "Current match replaced"));
+        }
+
+        private bool TryGetReplacementValues(out string oldValue)
+        {
+            oldValue = textBox2.Text;
+            if (!string.IsNullOrEmpty(oldValue))
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                this,
+                Localize(
+                    "要被替换的内容不能为空。",
+                    "The text to find cannot be empty."),
+                Localize("无法替换", "Cannot replace"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            textBox2.Focus();
+            return false;
+        }
+
+        private void ShowReplacementTextUnchangedMessage()
+        {
+            MessageBox.Show(
+                this,
+                Localize(
+                    "替换前后的内容相同，文本未发生变化。",
+                    "The find and replacement text are identical."),
+                Localize("文本未变化", "Text unchanged"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             textBox1.Focus();
         }
 
@@ -1024,6 +1093,11 @@ namespace ClipEditor
 
         private void FindNextOccurrence()
         {
+            TrySelectNextOccurrence();
+        }
+
+        private bool TrySelectNextOccurrence()
+        {
             string searchText = textBox2.Text;
             if (string.IsNullOrEmpty(searchText))
             {
@@ -1036,7 +1110,7 @@ namespace ClipEditor
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 textBox2.Focus();
-                return;
+                return false;
             }
 
             string editorText = textBox1.Text;
@@ -1069,7 +1143,7 @@ namespace ClipEditor
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 textBox2.Focus();
-                return;
+                return false;
             }
 
             textBox1.Focus();
@@ -1081,6 +1155,7 @@ namespace ClipEditor
                         "已从开头继续查找并选中匹配项",
                         "Search wrapped to the beginning; match selected")
                     : Localize("已选中匹配项", "Match selected"));
+            return true;
         }
 
         private void button7_Click(object sender, EventArgs e)
@@ -1529,8 +1604,8 @@ namespace ClipEditor
             ShowStatus(
                 automaticProcessingModeRadioButton.Checked
                     ? Localize(
-                        "已切换为自动处理模式；请选择并锁定一个文本处理按钮",
-                        "Automatic processing selected; choose a text-processing button to lock")
+                        "已切换为自动处理模式；请选择一个文本处理按钮或“全部替换”进行锁定",
+                        "Automatic processing selected; choose a text-processing button or Replace all to lock")
                     : directClipboardModeRadioButton.Checked
                     ? Localize(
                         "已切换为直接修改剪贴板模式",
@@ -1749,10 +1824,11 @@ namespace ClipEditor
                     processedText,
                     forceDisplay: true);
 
-                if (!string.Equals(
+                bool textChanged = !string.Equals(
                     sourceText,
                     processedText,
-                    StringComparison.Ordinal))
+                    StringComparison.Ordinal);
+                if (textChanged)
                 {
                     ExecuteClipboardOperation(
                         () =>
@@ -1770,7 +1846,13 @@ namespace ClipEditor
                 }
 
                 ShowStatus(
-                    Localize("已自动处理并写回剪贴板：", "Automatically processed and copied: ") +
+                    (textChanged
+                        ? Localize(
+                            "已自动处理并写回剪贴板：",
+                            "Automatically processed and copied: ")
+                        : Localize(
+                            "剪贴板内容无需更改：",
+                            "No clipboard changes needed: ")) +
                     processingButton.Text);
             }
             catch (ExternalException)
@@ -2064,6 +2146,7 @@ namespace ClipEditor
             label2.Text = Localize("查找：", "Find:");
             label3.Text = Localize("替换为：", "Replace with:");
             buttonFindNext.Text = Localize("查找下一个", "Find next");
+            buttonReplaceCurrent.Text = Localize("替换", "Replace");
             button6.Text = Localize("全部替换", "Replace all");
 
             toolsGroupBox.Text = Localize("文本处理", "Text processing");
@@ -2128,8 +2211,8 @@ namespace ClipEditor
             toolTip1.SetToolTip(
                 automaticProcessingModeRadioButton,
                 Localize(
-                    "自动启用实时监听；点击一个文本处理按钮将其锁定，之后复制的文本会自动处理并写回剪贴板",
-                    "Force live monitoring; lock one text-processing button to process and replace every newly copied text"));
+                    "自动启用实时监听；点击一个文本处理按钮或“全部替换”将其锁定，之后复制的文本会自动处理并写回剪贴板",
+                    "Force live monitoring; lock a text-processing button or Replace all to process every newly copied text"));
             toolTip1.SetToolTip(
                 startupClipboardRadioButton,
                 Localize(
@@ -2146,6 +2229,16 @@ namespace ClipEditor
                     "输入查找内容后按 Enter，或点击“查找下一个”",
                     "Enter search text, then press Enter or click Find next"));
             toolTip1.SetToolTip(
+                buttonReplaceCurrent,
+                Localize(
+                    "替换当前选中的匹配项；未选中匹配项时会查找并替换下一项",
+                    "Replace the selected match, or find and replace the next match"));
+            toolTip1.SetToolTip(
+                button6,
+                Localize(
+                    "替换所有匹配项；在自动处理模式中点击可锁定此替换规则",
+                    "Replace all matches; in Automatic mode, click to lock this replacement rule"));
+            toolTip1.SetToolTip(
                 historyTabControl,
                 Localize(
                     "剪贴板历史仅保留在本次运行中；点击标题切换，点击右侧 × 删除",
@@ -2153,7 +2246,7 @@ namespace ClipEditor
 
             System.Windows.Forms.Control[] controls =
             {
-                button1, button2, button3, button4, button5, button6, button7,
+                button1, button2, button3, button4, button5, button7,
                 buttonFindNext,
                 button8, button9, button10, button11, button12, button13,
                 button14, button15, button16, button17, button18, button20,

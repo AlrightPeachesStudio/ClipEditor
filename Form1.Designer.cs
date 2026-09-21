@@ -61,6 +61,7 @@
             this.buttonFindNext = new System.Windows.Forms.Button();
             this.label3 = new System.Windows.Forms.Label();
             this.textBox3 = new System.Windows.Forms.TextBox();
+            this.buttonReplaceCurrent = new System.Windows.Forms.Button();
             this.button6 = new System.Windows.Forms.Button();
             this.toolsGroupBox = new System.Windows.Forms.GroupBox();
             this.toolsLayout = new System.Windows.Forms.TableLayoutPanel();
@@ -486,7 +487,7 @@
             // replaceLayout
             // 
             this.replaceLayout.AutoSize = true;
-            this.replaceLayout.ColumnCount = 6;
+            this.replaceLayout.ColumnCount = 7;
             this.replaceLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.AutoSize));
             this.replaceLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
@@ -497,6 +498,8 @@
                 System.Windows.Forms.SizeType.AutoSize));
             this.replaceLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.Percent, 50F));
+            this.replaceLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
+                System.Windows.Forms.SizeType.AutoSize));
             this.replaceLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.AutoSize));
             this.replaceLayout.Controls.Add(this.label2, 0, 0);
@@ -504,7 +507,8 @@
             this.replaceLayout.Controls.Add(this.buttonFindNext, 2, 0);
             this.replaceLayout.Controls.Add(this.label3, 3, 0);
             this.replaceLayout.Controls.Add(this.textBox3, 4, 0);
-            this.replaceLayout.Controls.Add(this.button6, 5, 0);
+            this.replaceLayout.Controls.Add(this.buttonReplaceCurrent, 5, 0);
+            this.replaceLayout.Controls.Add(this.button6, 6, 0);
             this.replaceLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this.replaceLayout.Margin = new System.Windows.Forms.Padding(0);
             this.replaceLayout.Name = "replaceLayout";
@@ -566,6 +570,19 @@
             this.textBox3.Name = "textBox3";
             this.textBox3.TabIndex = 4;
             // 
+            // buttonReplaceCurrent
+            // 
+            this.buttonReplaceCurrent.Anchor = System.Windows.Forms.AnchorStyles.None;
+            this.buttonReplaceCurrent.AutoSize = true;
+            this.buttonReplaceCurrent.Margin = new System.Windows.Forms.Padding(0, 0, 6, 0);
+            this.buttonReplaceCurrent.MinimumSize = new System.Drawing.Size(80, 30);
+            this.buttonReplaceCurrent.Name = "buttonReplaceCurrent";
+            this.buttonReplaceCurrent.TabIndex = 5;
+            this.buttonReplaceCurrent.Text = "替换";
+            this.buttonReplaceCurrent.UseVisualStyleBackColor = true;
+            this.buttonReplaceCurrent.Click += new System.EventHandler(
+                this.ButtonReplaceCurrent_Click);
+            // 
             // button6
             // 
             this.button6.Anchor = System.Windows.Forms.AnchorStyles.None;
@@ -573,7 +590,7 @@
             this.button6.Margin = new System.Windows.Forms.Padding(0);
             this.button6.MinimumSize = new System.Drawing.Size(80, 30);
             this.button6.Name = "button6";
-            this.button6.TabIndex = 5;
+            this.button6.TabIndex = 6;
             this.button6.Text = "全部替换";
             this.button6.UseVisualStyleBackColor = true;
             this.button6.Click += new System.EventHandler(this.Button6_Click);
@@ -980,6 +997,7 @@
         private System.Windows.Forms.Button buttonFindNext;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.Button buttonReplaceCurrent;
         private System.Windows.Forms.Button button6;
         private System.Windows.Forms.GroupBox toolsGroupBox;
         private System.Windows.Forms.TableLayoutPanel toolsLayout;
