@@ -1,5 +1,7 @@
 # ClipEditor
+
 ## 简体中文简介
+
 ![ClipEditor 简体中文界面](cn.png)
 
 **Windows 剪贴板文本预处理工具 · A Windows Clipboard Text Preprocessor**
@@ -369,7 +371,7 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 ## English
 
-[简体中文](#简体中文)
+[简体中文简介](#简体中文简介)
 
 [More apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
