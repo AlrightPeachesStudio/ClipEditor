@@ -34,6 +34,7 @@
             this.rootLayout = new System.Windows.Forms.TableLayoutPanel();
             this.headerLayout = new System.Windows.Forms.TableLayoutPanel();
             this.brandLabel = new System.Windows.Forms.Label();
+            this.buttonLatestVersion = new System.Windows.Forms.Button();
             this.buttonDeveloperApps = new System.Windows.Forms.Button();
             this.buttonLanguage = new System.Windows.Forms.Button();
             this.historyTabControl = new System.Windows.Forms.TabControl();
@@ -146,16 +147,19 @@
             // headerLayout
             // 
             this.headerLayout.AutoSize = true;
-            this.headerLayout.ColumnCount = 3;
+            this.headerLayout.ColumnCount = 4;
             this.headerLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.Percent, 100F));
             this.headerLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.AutoSize));
             this.headerLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
                 System.Windows.Forms.SizeType.AutoSize));
+            this.headerLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(
+                System.Windows.Forms.SizeType.AutoSize));
             this.headerLayout.Controls.Add(this.brandLabel, 0, 0);
-            this.headerLayout.Controls.Add(this.buttonDeveloperApps, 1, 0);
-            this.headerLayout.Controls.Add(this.buttonLanguage, 2, 0);
+            this.headerLayout.Controls.Add(this.buttonLatestVersion, 1, 0);
+            this.headerLayout.Controls.Add(this.buttonDeveloperApps, 2, 0);
+            this.headerLayout.Controls.Add(this.buttonLanguage, 3, 0);
             this.headerLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this.headerLayout.Margin = new System.Windows.Forms.Padding(0, 0, 0, 2);
             this.headerLayout.Name = "headerLayout";
@@ -178,6 +182,19 @@
             this.brandLabel.TabIndex = 0;
             this.brandLabel.Text = "Made by Alright Peaches Studio";
             // 
+            // buttonLatestVersion
+            // 
+            this.buttonLatestVersion.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            this.buttonLatestVersion.AutoSize = true;
+            this.buttonLatestVersion.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
+            this.buttonLatestVersion.MinimumSize = new System.Drawing.Size(86, 30);
+            this.buttonLatestVersion.Name = "buttonLatestVersion";
+            this.buttonLatestVersion.TabIndex = 1;
+            this.buttonLatestVersion.Text = "最新版";
+            this.buttonLatestVersion.UseVisualStyleBackColor = true;
+            this.buttonLatestVersion.Click += new System.EventHandler(
+                this.buttonLatestVersion_Click);
+            // 
             // buttonDeveloperApps
             // 
             this.buttonDeveloperApps.Anchor = System.Windows.Forms.AnchorStyles.Right;
@@ -185,7 +202,7 @@
             this.buttonDeveloperApps.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
             this.buttonDeveloperApps.MinimumSize = new System.Drawing.Size(145, 30);
             this.buttonDeveloperApps.Name = "buttonDeveloperApps";
-            this.buttonDeveloperApps.TabIndex = 1;
+            this.buttonDeveloperApps.TabIndex = 2;
             this.buttonDeveloperApps.Text = "开发者其他软件和应用";
             this.buttonDeveloperApps.UseVisualStyleBackColor = true;
             this.buttonDeveloperApps.Click += new System.EventHandler(
@@ -198,7 +215,7 @@
             this.buttonLanguage.Margin = new System.Windows.Forms.Padding(0);
             this.buttonLanguage.MinimumSize = new System.Drawing.Size(74, 30);
             this.buttonLanguage.Name = "buttonLanguage";
-            this.buttonLanguage.TabIndex = 2;
+            this.buttonLanguage.TabIndex = 3;
             this.buttonLanguage.Text = "English";
             this.buttonLanguage.UseVisualStyleBackColor = true;
             this.buttonLanguage.Click += new System.EventHandler(
@@ -970,6 +987,7 @@
         private System.Windows.Forms.TableLayoutPanel rootLayout;
         private System.Windows.Forms.TableLayoutPanel headerLayout;
         private System.Windows.Forms.Label brandLabel;
+        private System.Windows.Forms.Button buttonLatestVersion;
         private System.Windows.Forms.Button buttonDeveloperApps;
         private System.Windows.Forms.Button buttonLanguage;
         private System.Windows.Forms.TabControl historyTabControl;

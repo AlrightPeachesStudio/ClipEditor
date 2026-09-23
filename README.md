@@ -9,7 +9,7 @@ Made by **Alright Peaches Studio**
 [简体中文](#简体中文) · [English](#english)
 
 ## 简体中文
-
+[开发者Alright Peaches Studio的其它软件和应用](https://store.steampowered.com/search/?l=schinese&term=Alright+Peaches+Studio)
 ### 软件简介
 
 ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主要用于在粘贴之前，对剪贴板中的文本进行纯文本提取、编辑和预处理。
@@ -138,11 +138,56 @@ def greet():
 
 适合在较长的 ChatGPT 回答、文档或代码中寻找关键词、变量名或特定文字。输入查找内容后，点击按钮，或在查找框中按 `Enter`。
 
+**替换：只修改当前匹配项。**
+
+如果主文本框中已经选中了与查找内容匹配的文字，点击“替换”只修改该匹配项；如果当前没有选中有效匹配项，程序会先定位当前位置之后最先出现的匹配项，再使用对应内容替换。适合逐项检查后决定是否修改，而不是一次更改全文。
+
 **全部替换：一次处理重复出现的内容，减少遗漏和重复劳动。**
 
 适合统一修改名称、替换重复用词，或批量删除固定文字。替换内容可以为空，用于删除匹配内容。
 
 当前查找与替换使用区分大小写的精确文本匹配，不支持正则表达式，也不会区分代码中的变量、注释和字符串。
+
+**使用 `&&&` 设置多组查找与替换规则**
+
+查找、替换和全部替换支持使用 `&&&` 分隔多组内容。各查找项与相同位置的替换项一一对应。
+
+例如：
+
+- 查找：`张三&&&李四`
+- 替换为：`王五&&&赵六`
+
+对应关系为：
+
+- `张三` → `王五`
+- `李四` → `赵六`
+
+“查找下一个”会选择当前位置之后最先出现的任一查找项；“替换”会修改当前选中的匹配项，或自动查找并替换接下来最先出现的一项；“全部替换”则处理全文中的所有对应内容。
+
+全部替换以原文为基础同时应用各组规则。前一组产生的结果不会被后一组再次替换，避免出现连锁替换。
+
+为了让空格在说明中可见，下面用 `␠` 表示一个真正的空格。实际输入时不要输入 `␠` 字符，而是在查找框最前面按一次空格键。
+
+例如：
+
+- 查找：`␠&&&111`
+- 替换为：`d&&&`
+
+这表示：
+
+- 空格 → `d`
+- `111` → 空内容，即删除 `111`
+
+原文 `ABC 111 DEF` 执行全部替换后会变成 `ABCddDEF`：两个空格分别变成 `d`，`111` 被删除。
+
+使用多组规则时需要注意：
+
+- 查找项和替换项必须按照相同顺序一一对应。
+- 两边的项目数量必须相同，否则程序会停止操作并显示提示。
+- 查找项不能为空。
+- 替换项可以为空；空项表示删除对应内容。
+- 如果整个替换框为空，所有匹配到的查找项都会被删除。
+- `&&&` 是多组内容的专用分隔符。
 
 #### 9. 临时历史标签
 
@@ -183,6 +228,8 @@ def greet():
 
 处理模式决定“处理后是否自动写回剪贴板”，监听模式决定“是否自动导入新的剪贴板内容”。两者互相独立。
 
+> 自动处理模式是例外：选择该模式时会自动启用实时监听，并暂时锁定监听模式选项，以便对新复制的文字立即执行已锁定操作。
+
 #### 常规处理模式：先检查，再决定复制什么
 
 适合需要逐步处理、比较结果或手动修改内容的情况。
@@ -202,6 +249,22 @@ def greet():
 此模式不会在每次键盘输入时自动同步，也不会仅因导入文本或切换历史标签就自动写回剪贴板。只需要转为纯文本、不执行其他处理时，可以使用“复制全部”。
 
 清空文本的处理操作在此模式下也可能同步清空剪贴板。
+
+#### 自动处理模式：复制后按锁定顺序完成一组固定操作
+
+适合需要反复复制不同文本，并对每段文本执行相同处理流程的情况。
+
+进入自动处理模式后，可以点击“全部替换”或文本处理区域中的按钮进行锁定：
+
+- 第一次点击某个按钮，将它加入自动处理步骤，并显示锁定状态。
+- 再次点击同一按钮，将它从自动处理步骤中解锁。
+- 可以同时锁定多个按钮，程序按照锁定的先后顺序依次执行，每个步骤只执行一次。
+- 全部步骤完成后，程序只把最终结果写回剪贴板一次，随后可直接在目标应用中粘贴。
+- 切换回常规模式或直接修改剪贴板模式时，当前锁定步骤会被清除。
+
+例如，先锁定“全部替换”，再锁定“去所有空格”，新复制的文字会先执行替换，再删除空格，最后将完整结果写回剪贴板。
+
+锁定“全部替换”时，程序保存当时填写的查找和替换规则，包括 `&&&` 多组规则以及空替换项。锁定后修改输入框不会悄悄改变已锁定规则；如需更新规则，应先点击“全部替换”解锁，再使用新内容重新锁定。
 
 #### 仅启动时导入模式：保持当前编辑内容稳定
 
@@ -272,6 +335,8 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 当前实现的文本处理在本机进行，不提供文本上传或云端历史功能。点击“开发者其他软件和应用”会调用默认浏览器打开下方 Steam 页面；浏览器和 Steam 有各自的数据处理规则。
 
+该按钮的实际地址随界面语言变化：简体中文界面打开 Steam 简体中文搜索页面，英文界面打开原英文搜索页面。“最新版”按钮则调用默认浏览器打开 ClipEditor 的 GitHub 页面。
+
 注意：
 
 - 剪贴板可能包含密码、身份信息或其他敏感内容，开启实时监听前请了解这一行为。
@@ -292,7 +357,9 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 **Made by Alright Peaches Studio**
 
-[在 Steam 查看其他软件和应用](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
+[开发者Alright Peaches Studio的其它软件和应用](https://store.steampowered.com/search/?l=schinese&term=Alright+Peaches+Studio)
+
+[查看 ClipEditor 最新版](https://github.com/AlrightPeachesStudio/ClipEditor)
 
 ### 许可证
 
@@ -301,6 +368,7 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 允许使用、修改、分发和商业使用；分发软件副本或代码的重要部分时，应保留版权及许可声明。软件按原样提供，不作任何担保。第三方组件和资源如附带独立许可证，应遵守其各自条款。
 
 ## English
+[More software and apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
 ![ClipEditor English interface](en.png)
 
@@ -413,9 +481,52 @@ This adds indentation; it does not reset every line to the selected width. Repea
 
 **Find next** locates content without modifying it. Use the button or press `Enter` in the search field to find keywords, variable names, or specific text.
 
+**Replace** changes only the current match. If valid matching text is already selected in the editor, that match is replaced. If no valid match is selected, the application finds the earliest matching item after the current position and replaces it with the corresponding value. This supports reviewing and changing matches one at a time.
+
 **Replace all** changes repeated text in one operation. An empty replacement deletes matches.
 
 Matching is case-sensitive and literal, not regular-expression based. The application does not distinguish variables from comments or string literals.
+
+**Using `&&&` for multiple find and replacement rules**
+
+Find, Replace, and Replace All support multiple items separated by `&&&`. Each find item is paired with the replacement item in the same position.
+
+For example:
+
+- Find: `cat&&&111`
+- Replace with: `dog&&&000`
+
+The corresponding rules are:
+
+- `cat` → `dog`
+- `111` → `000`
+
+Find next selects whichever find item appears first after the current position. Replace changes the currently selected match, or finds and replaces the next earliest item. Replace all processes every corresponding occurrence throughout the text.
+
+Replace All applies every rule to the original text simultaneously. Text produced by one rule is not processed again by another rule, preventing unintended chained replacements.
+
+In the following example, `␠` visually represents one real space. Do not type the `␠` character. Instead, press the Space key once at the beginning of the Find box.
+
+For example:
+
+- Find: `␠&&&111`
+- Replace with: `d&&&`
+
+This creates two rules:
+
+- Space → `d`
+- `111` → empty text, which deletes `111`
+
+After Replace All, `ABC 111 DEF` becomes `ABCddDEF`: both spaces become `d`, while `111` is deleted.
+
+When using multiple rules:
+
+- Find and replacement items must correspond in the same order.
+- Both sides must contain the same number of items, or the application stops and displays a message.
+- Find items cannot be empty.
+- Replacement items may be empty; an empty item deletes the corresponding match.
+- If the entire Replace box is empty, every matched find item is deleted.
+- `&&&` is the reserved separator for multiple items.
 
 #### 9. Temporary history tabs
 
@@ -456,6 +567,8 @@ This mechanism does not save editor text or history entries.
 
 Processing settings determine whether results are written back automatically. Monitoring settings determine whether new clipboard content is imported automatically. These settings are independent.
 
+> Automatic processing is the exception: selecting it enables live monitoring and temporarily locks the monitoring choices so newly copied text can immediately run through the locked actions.
+
 #### Normal processing: inspect first, copy when ready
 
 Use this mode for step-by-step cleanup, manual editing, or checking results before replacing clipboard contents.
@@ -475,6 +588,22 @@ Example: copy code from ChatGPT, add four leading spaces, then paste directly in
 This mode does not synchronize every keystroke. Importing text or selecting a history tab does not automatically rewrite the clipboard. For plain-text conversion without another operation, use Copy all.
 
 Clearing the editor through a processing operation can also clear the clipboard in this mode.
+
+#### Automatic processing: run a locked workflow after every copy
+
+Use this mode when you repeatedly copy different text and want every item to follow the same processing workflow.
+
+In Automatic mode, click **Replace all** or any button in the text-processing area to lock or unlock it:
+
+- The first click adds that button to the automatic workflow and displays its locked state.
+- Clicking the same button again removes it from the workflow.
+- Multiple buttons can be locked together. They run once each in the order in which they were locked.
+- After all steps finish, only the final result is written back to the clipboard, ready to paste into the destination application.
+- Switching to Normal or Direct clipboard mode clears the current locked workflow.
+
+For example, lock **Replace all** first and **Remove spaces** second. Each newly copied text is replaced first, then has its spaces removed, and the final result is written back to the clipboard.
+
+When **Replace all** is locked, the application stores the Find and Replace rules entered at that moment, including multiple `&&&` rules and empty replacement items. Later edits to the input boxes do not silently change the locked rule. Unlock Replace all and lock it again to use updated values.
 
 #### Startup-only import: keep editing stable
 
@@ -543,6 +672,8 @@ Values: `UiLanguage`, `ProcessingMode`, and `ClipboardWatchMode`. These settings
 
 The current text-processing implementation runs locally and does not provide text uploads or cloud history. The developer-apps button opens the Steam page linked below in your default browser; the browser and Steam handle data under their own rules.
 
+The actual developer-apps URL follows the interface language: Simplified Chinese opens the Simplified Chinese Steam search page, while English keeps the original English search page. The Latest version button opens the ClipEditor GitHub page in the default browser.
+
 Please remember:
 
 - Clipboard content may contain passwords or personal information, especially during live monitoring.
@@ -562,8 +693,9 @@ Do not post real passwords, keys, or private clipboard content in public reports
 ### Developer
 
 **Made by Alright Peaches Studio**
+[More software and apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
-[More software and apps on Steam](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
+[View the latest ClipEditor version](https://github.com/AlrightPeachesStudio/ClipEditor)
 
 ### License
 

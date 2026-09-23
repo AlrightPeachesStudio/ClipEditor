@@ -24,8 +24,13 @@ namespace ClipEditor
         private const int PreferredMinimumWindowWidth = 1050;
         private const int PreferredMinimumWindowHeight = 660;
         private const int WmClipboardUpdate = 0x031D;
-        private const string DeveloperStoreUrl =
+        private const string MultiValueSeparator = "&&&";
+        private const string DeveloperStoreUrlEnglish =
             "https://store.steampowered.com/search?term=Alright+Peaches+Studio";
+        private const string DeveloperStoreUrlChinese =
+            "https://store.steampowered.com/search/?l=schinese&term=Alright+Peaches+Studio";
+        private const string LatestVersionUrl =
+            "https://github.com/AlrightPeachesStudio/ClipEditor";
         private const string RegistryPath =
             @"Software\Alright Peaches Studio\ClipEditor";
         private const string RegistryLanguageValueName = "UiLanguage";
@@ -60,6 +65,19 @@ namespace ClipEditor
             public Button Button { get; private set; }
 
             public Func<string, string> ProcessingAction { get; private set; }
+        }
+
+        private sealed class ReplacementRule
+        {
+            public ReplacementRule(string findText, string replacementText)
+            {
+                FindText = findText;
+                ReplacementText = replacementText ?? string.Empty;
+            }
+
+            public string FindText { get; private set; }
+
+            public string ReplacementText { get; private set; }
         }
 
         private sealed class ClipboardHistoryEntry
@@ -978,33 +996,27 @@ namespace ClipEditor
                 return;
             }
 
-            string oldValue;
-            if (!TryGetReplacementValues(out oldValue))
+            ReplacementRule[] rules;
+            if (!TryGetReplacementRules(out rules))
             {
-                return;
-            }
-
-            string newValue = textBox3.Text ?? string.Empty;
-            if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
-            {
-                ShowReplacementTextUnchangedMessage();
                 return;
             }
 
             if (automaticProcessingModeRadioButton.Checked)
             {
                 // 锁定当前配置，之后修改输入框不会悄悄改变已锁定的操作。
-                string lockedFindText = oldValue;
-                string lockedReplacementText = newValue;
+                ReplacementRule[] lockedRules = rules;
                 ToggleAutomaticProcessingAction(
                     button6,
-                    value => value.Replace(
-                        lockedFindText,
-                        lockedReplacementText));
+                    value => ReplaceAllByRules(value, lockedRules));
                 return;
             }
 
-            int replacementCount = CountOccurrences(textBox1.Text, oldValue);
+            int replacementCount;
+            string replacedText = ReplaceAllByRules(
+                textBox1.Text,
+                rules,
+                out replacementCount);
             if (replacementCount == 0)
             {
                 MessageBox.Show(
@@ -1019,7 +1031,7 @@ namespace ClipEditor
                 return;
             }
 
-            SetEditorText(textBox1.Text.Replace(oldValue, newValue));
+            SetEditorText(replacedText);
             ShowStatus(
                 Localize("已替换 ", "Replaced ") + replacementCount +
                 Localize(" 处内容", " occurrence(s)"));
@@ -1028,61 +1040,139 @@ namespace ClipEditor
 
         private void ButtonReplaceCurrent_Click(object sender, EventArgs e)
         {
-            string oldValue;
-            if (!TryGetReplacementValues(out oldValue))
+            ReplacementRule[] rules;
+            if (!TryGetReplacementRules(out rules))
             {
                 return;
             }
 
-            string newValue = textBox3.Text ?? string.Empty;
-            if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            int matchedRuleIndex = FindRuleForSelectedText(rules);
+            if (matchedRuleIndex < 0 &&
+                !TrySelectNextOccurrence(
+                    rules.Select(rule => rule.FindText).ToArray(),
+                    out matchedRuleIndex))
+            {
+                return;
+            }
+
+            ReplacementRule matchedRule = rules[matchedRuleIndex];
+            if (string.Equals(
+                textBox1.SelectedText,
+                matchedRule.ReplacementText,
+                StringComparison.Ordinal))
             {
                 ShowReplacementTextUnchangedMessage();
                 return;
             }
 
-            bool currentSelectionMatches =
-                textBox1.SelectionLength == oldValue.Length &&
-                string.Equals(
-                    textBox1.SelectedText,
-                    oldValue,
-                    StringComparison.CurrentCultureIgnoreCase);
-
-            if (!currentSelectionMatches && !TrySelectNextOccurrence())
-            {
-                return;
-            }
-
             int matchStart = textBox1.SelectionStart;
             string replacedText = textBox1.Text
-                .Remove(matchStart, oldValue.Length)
-                .Insert(matchStart, newValue);
+                .Remove(matchStart, matchedRule.FindText.Length)
+                .Insert(matchStart, matchedRule.ReplacementText);
 
             SetEditorText(replacedText, preserveSelection: false);
             textBox1.Focus();
-            textBox1.Select(matchStart, newValue.Length);
+            textBox1.Select(
+                matchStart,
+                matchedRule.ReplacementText.Length);
             textBox1.ScrollToCaret();
             ShowStatus(Localize("已替换当前匹配项", "Current match replaced"));
         }
 
-        private bool TryGetReplacementValues(out string oldValue)
+        private bool TryGetFindTerms(out string[] findTerms)
         {
-            oldValue = textBox2.Text;
-            if (!string.IsNullOrEmpty(oldValue))
+            string rawFindText = textBox2.Text;
+            if (string.IsNullOrEmpty(rawFindText))
             {
-                return true;
+                findTerms = null;
+                MessageBox.Show(
+                    this,
+                    Localize(
+                        "要查找的内容不能为空。",
+                        "The text to find cannot be empty."),
+                    Localize("无法查找", "Cannot find"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                textBox2.Focus();
+                return false;
             }
 
-            MessageBox.Show(
-                this,
-                Localize(
-                    "要被替换的内容不能为空。",
-                    "The text to find cannot be empty."),
-                Localize("无法替换", "Cannot replace"),
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-            textBox2.Focus();
-            return false;
+            findTerms = rawFindText.Split(
+                new[] { MultiValueSeparator },
+                StringSplitOptions.None);
+            if (findTerms.Any(string.IsNullOrEmpty))
+            {
+                MessageBox.Show(
+                    this,
+                    Localize(
+                        "查找内容中的 &&& 两侧都必须有文字，不能包含空的查找项。",
+                        "Each &&& separator in Find must have text on both sides; empty find items are not allowed."),
+                    Localize("查找格式无效", "Invalid find format"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                textBox2.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryGetReplacementRules(out ReplacementRule[] rules)
+        {
+            rules = null;
+            string[] findTerms;
+            if (!TryGetFindTerms(out findTerms))
+            {
+                return false;
+            }
+
+            string rawReplacementText = textBox3.Text ?? string.Empty;
+            string[] replacementTerms;
+            if (rawReplacementText.Length == 0)
+            {
+                replacementTerms = Enumerable.Repeat(
+                    string.Empty,
+                    findTerms.Length).ToArray();
+            }
+            else
+            {
+                replacementTerms = rawReplacementText.Split(
+                    new[] { MultiValueSeparator },
+                    StringSplitOptions.None);
+            }
+
+            if (replacementTerms.Length != findTerms.Length)
+            {
+                MessageBox.Show(
+                    this,
+                    Localize(
+                        "查找项和替换项的数量必须相同。请使用 &&& 分隔一一对应的内容。",
+                        "Find and replacement item counts must match. Use &&& to separate corresponding items."),
+                    Localize("替换格式无效", "Invalid replacement format"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                textBox3.Focus();
+                return false;
+            }
+
+            rules = findTerms
+                .Select((findText, index) =>
+                    new ReplacementRule(
+                        findText,
+                        replacementTerms[index]))
+                .Where(rule => !string.Equals(
+                    rule.FindText,
+                    rule.ReplacementText,
+                    StringComparison.Ordinal))
+                .ToArray();
+
+            if (rules.Length == 0)
+            {
+                ShowReplacementTextUnchangedMessage();
+                return false;
+            }
+
+            return true;
         }
 
         private void ShowReplacementTextUnchangedMessage()
@@ -1121,41 +1211,51 @@ namespace ClipEditor
 
         private bool TrySelectNextOccurrence()
         {
-            string searchText = textBox2.Text;
-            if (string.IsNullOrEmpty(searchText))
+            string[] searchTerms;
+            if (!TryGetFindTerms(out searchTerms))
             {
-                MessageBox.Show(
-                    this,
-                    Localize(
-                        "请输入要查找的内容。",
-                        "Enter the text you want to find."),
-                    Localize("无法查找", "Cannot find"),
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                textBox2.Focus();
                 return false;
             }
+
+            int matchedTermIndex;
+            return TrySelectNextOccurrence(
+                searchTerms,
+                out matchedTermIndex);
+        }
+
+        private bool TrySelectNextOccurrence(
+            string[] searchTerms,
+            out int matchedTermIndex)
+        {
+            matchedTermIndex = -1;
 
             string editorText = textBox1.Text;
             int startIndex = Math.Min(
                 textBox1.SelectionStart + textBox1.SelectionLength,
                 editorText.Length);
-            int matchIndex = editorText.IndexOf(
-                searchText,
+            int matchIndex;
+            bool found = TryFindEarliestMatch(
+                editorText,
                 startIndex,
-                StringComparison.CurrentCultureIgnoreCase);
+                searchTerms,
+                StringComparison.CurrentCultureIgnoreCase,
+                out matchIndex,
+                out matchedTermIndex);
             bool wrappedToStart = false;
 
-            if (matchIndex < 0 && startIndex > 0)
+            if (!found && startIndex > 0)
             {
-                matchIndex = editorText.IndexOf(
-                    searchText,
+                found = TryFindEarliestMatch(
+                    editorText,
                     0,
-                    StringComparison.CurrentCultureIgnoreCase);
-                wrappedToStart = matchIndex >= 0;
+                    searchTerms,
+                    StringComparison.CurrentCultureIgnoreCase,
+                    out matchIndex,
+                    out matchedTermIndex);
+                wrappedToStart = found;
             }
 
-            if (matchIndex < 0)
+            if (!found)
             {
                 MessageBox.Show(
                     this,
@@ -1170,7 +1270,9 @@ namespace ClipEditor
             }
 
             textBox1.Focus();
-            textBox1.Select(matchIndex, searchText.Length);
+            textBox1.Select(
+                matchIndex,
+                searchTerms[matchedTermIndex].Length);
             textBox1.ScrollToCaret();
             ShowStatus(
                 wrappedToStart
@@ -1179,6 +1281,28 @@ namespace ClipEditor
                         "Search wrapped to the beginning; match selected")
                     : Localize("已选中匹配项", "Match selected"));
             return true;
+        }
+
+        private int FindRuleForSelectedText(ReplacementRule[] rules)
+        {
+            if (textBox1.SelectionLength == 0)
+            {
+                return -1;
+            }
+
+            for (int index = 0; index < rules.Length; index++)
+            {
+                if (textBox1.SelectionLength == rules[index].FindText.Length &&
+                    string.Equals(
+                        textBox1.SelectedText,
+                        rules[index].FindText,
+                        StringComparison.CurrentCultureIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
 
         private void button7_Click(object sender, EventArgs e)
@@ -1763,12 +1887,25 @@ namespace ClipEditor
 
         private void buttonDeveloperApps_Click(object sender, EventArgs e)
         {
+            OpenWebsite(
+                useEnglish
+                    ? DeveloperStoreUrlEnglish
+                    : DeveloperStoreUrlChinese);
+        }
+
+        private void buttonLatestVersion_Click(object sender, EventArgs e)
+        {
+            OpenWebsite(LatestVersionUrl);
+        }
+
+        private void OpenWebsite(string url)
+        {
             try
             {
                 Process.Start(
                     new ProcessStartInfo
                     {
-                        FileName = DeveloperStoreUrl,
+                        FileName = url,
                         UseShellExecute = true
                     });
             }
@@ -2195,6 +2332,7 @@ namespace ClipEditor
 
             brandLabel.Text = "Made by Alright Peaches Studio";
             buttonLanguage.Text = useEnglish ? "简体中文" : "English";
+            buttonLatestVersion.Text = Localize("最新版", "Latest version");
             buttonDeveloperApps.Text = Localize(
                 "开发者其他软件和应用",
                 "More apps");
@@ -2270,8 +2408,13 @@ namespace ClipEditor
             toolTip1.SetToolTip(
                 buttonDeveloperApps,
                 Localize(
-                    "用默认浏览器打开 Alright Peaches Studio 的 Steam 页面",
+                    "用默认浏览器打开 Alright Peaches Studio 的简体中文 Steam 搜索页面",
                     "Open the Alright Peaches Studio Steam page in your default browser"));
+            toolTip1.SetToolTip(
+                buttonLatestVersion,
+                Localize(
+                    "用默认浏览器打开 ClipEditor 的 GitHub 页面以查看最新版",
+                    "Open the ClipEditor GitHub page to view the latest version"));
             toolTip1.SetToolTip(
                 regularModeRadioButton,
                 Localize(
@@ -2300,18 +2443,23 @@ namespace ClipEditor
             toolTip1.SetToolTip(
                 textBox2,
                 Localize(
-                    "输入查找内容后按 Enter，或点击“查找下一个”",
-                    "Enter search text, then press Enter or click Find next"));
+                    "输入查找内容后按 Enter，或点击“查找下一个”；可用 &&& 分隔多个查找项",
+                    "Enter search text, then press Enter or click Find next; use &&& to separate multiple items"));
+            toolTip1.SetToolTip(
+                textBox3,
+                Localize(
+                    "可用 &&& 输入与查找项一一对应的多个替换项；空项表示删除，整个替换框为空时全部删除",
+                    "Use &&& for replacement items corresponding to Find; empty items delete matches, and an entirely empty box deletes all matches"));
             toolTip1.SetToolTip(
                 buttonReplaceCurrent,
                 Localize(
-                    "替换当前选中的匹配项；未选中匹配项时会查找并替换下一项",
-                    "Replace the selected match, or find and replace the next match"));
+                    "替换最先出现的匹配项；使用 &&& 时按位置选择对应替换项",
+                    "Replace the earliest match; with &&&, use its corresponding replacement item"));
             toolTip1.SetToolTip(
                 button6,
                 Localize(
-                    "替换所有匹配项；自动处理模式中点击可锁定当前替换规则，再次点击可解锁",
-                    "Replace all matches; in Automatic mode, click to lock the current rule and click again to unlock"));
+                    "全部替换 &&& 分隔的各组对应内容；自动处理模式中点击可锁定当前规则，再次点击可解锁",
+                    "Replace all corresponding &&& groups; in Automatic mode, click to lock the rule and click again to unlock"));
             toolTip1.SetToolTip(
                 historyTabControl,
                 Localize(
@@ -2519,25 +2667,108 @@ namespace ClipEditor
             }
         }
 
-        private static int CountOccurrences(string source, string value)
+        private static bool TryFindEarliestMatch(
+            string source,
+            int startIndex,
+            string[] searchTerms,
+            StringComparison comparison,
+            out int matchIndex,
+            out int matchedTermIndex)
         {
-            if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(value))
+            matchIndex = -1;
+            matchedTermIndex = -1;
+            if (string.IsNullOrEmpty(source) ||
+                searchTerms == null ||
+                searchTerms.Length == 0)
             {
-                return 0;
+                return false;
             }
 
-            int count = 0;
-            int searchIndex = 0;
-            while ((searchIndex = source.IndexOf(
-                value,
-                searchIndex,
-                StringComparison.Ordinal)) >= 0)
+            int safeStartIndex = Math.Max(
+                0,
+                Math.Min(startIndex, source.Length));
+            for (int index = 0; index < searchTerms.Length; index++)
             {
-                count++;
-                searchIndex += value.Length;
+                string searchTerm = searchTerms[index];
+                if (string.IsNullOrEmpty(searchTerm))
+                {
+                    continue;
+                }
+
+                int candidateIndex = source.IndexOf(
+                    searchTerm,
+                    safeStartIndex,
+                    comparison);
+                if (candidateIndex >= 0 &&
+                    (matchIndex < 0 || candidateIndex < matchIndex))
+                {
+                    matchIndex = candidateIndex;
+                    matchedTermIndex = index;
+                }
             }
 
-            return count;
+            return matchIndex >= 0;
+        }
+
+        private static string ReplaceAllByRules(
+            string source,
+            ReplacementRule[] rules)
+        {
+            int ignoredReplacementCount;
+            return ReplaceAllByRules(
+                source,
+                rules,
+                out ignoredReplacementCount);
+        }
+
+        private static string ReplaceAllByRules(
+            string source,
+            ReplacementRule[] rules,
+            out int replacementCount)
+        {
+            source = source ?? string.Empty;
+            replacementCount = 0;
+            if (source.Length == 0 || rules == null || rules.Length == 0)
+            {
+                return source;
+            }
+
+            string[] findTerms = rules
+                .Select(rule => rule.FindText)
+                .ToArray();
+            StringBuilder result = new StringBuilder(source.Length);
+            int sourceIndex = 0;
+
+            while (sourceIndex < source.Length)
+            {
+                int matchIndex;
+                int matchedRuleIndex;
+                if (!TryFindEarliestMatch(
+                    source,
+                    sourceIndex,
+                    findTerms,
+                    StringComparison.Ordinal,
+                    out matchIndex,
+                    out matchedRuleIndex))
+                {
+                    result.Append(
+                        source,
+                        sourceIndex,
+                        source.Length - sourceIndex);
+                    break;
+                }
+
+                result.Append(
+                    source,
+                    sourceIndex,
+                    matchIndex - sourceIndex);
+                result.Append(rules[matchedRuleIndex].ReplacementText);
+                sourceIndex = matchIndex +
+                    rules[matchedRuleIndex].FindText.Length;
+                replacementCount++;
+            }
+
+            return result.ToString();
         }
 
         private static string[] SplitLines(string value)
