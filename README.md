@@ -6,7 +6,7 @@
 
 Made by **Alright Peaches Studio**
 
-[简体中文](#简体中文) · [English](#english)
+[English](#english)
 
 ## 简体中文
 
@@ -370,6 +370,8 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 允许使用、修改、分发和商业使用；分发软件副本或代码的重要部分时，应保留版权及许可声明。软件按原样提供，不作任何担保。第三方组件和资源如附带独立许可证，应遵守其各自条款。
 
 ## English
+
+[简体中文](#简体中文)
 
 [More apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
