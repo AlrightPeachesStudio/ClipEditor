@@ -9,7 +9,9 @@ Made by **Alright Peaches Studio**
 [简体中文](#简体中文) · [English](#english)
 
 ## 简体中文
+
 [开发者Alright Peaches Studio的其它软件和应用](https://store.steampowered.com/search/?l=schinese&term=Alright+Peaches+Studio)
+
 ### 软件简介
 
 ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主要用于在粘贴之前，对剪贴板中的文本进行纯文本提取、编辑和预处理。
@@ -368,7 +370,8 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 允许使用、修改、分发和商业使用；分发软件副本或代码的重要部分时，应保留版权及许可声明。软件按原样提供，不作任何担保。第三方组件和资源如附带独立许可证，应遵守其各自条款。
 
 ## English
-[More software and apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
+
+[More apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
 ![ClipEditor English interface](en.png)
 
@@ -693,7 +696,8 @@ Do not post real passwords, keys, or private clipboard content in public reports
 ### Developer
 
 **Made by Alright Peaches Studio**
-[More software and apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
+
+[More apps from the developer - Alright Peaches Studio](https://store.steampowered.com/search?term=Alright+Peaches+Studio)
 
 [View the latest ClipEditor version](https://github.com/AlrightPeachesStudio/ClipEditor)
 
