@@ -4,7 +4,7 @@
 
 ![ClipEditor 简体中文界面](cn.png)
 
-**Windows 剪贴板文本预处理工具 · A Windows Clipboard Text Preprocessor**
+**Windows 剪贴板文本处理与本地截图识字工具 · A Windows Clipboard Text Processor with Local Screenshot OCR**
 
 Made by **Alright Peaches Studio**
 
@@ -14,15 +14,24 @@ Made by **Alright Peaches Studio**
 
 ### 软件简介
 
-ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主要用于在粘贴之前，对剪贴板中的文本进行纯文本提取、编辑和预处理。
+ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，可提取剪贴板纯文本、识别截图和剪贴板图片中的文字，并在粘贴前完成编辑、替换与格式整理。文字识别使用本地 PaddleOCR 引擎，完整发行包无需客户安装 Python。
 
 从 Word、PDF、ChatGPT 网页或其他网站复制内容时，剪贴板中往往同时包含文字和富文本格式。直接粘贴到其他应用中，可能会带入不需要的字体、字号、颜色、背景或其他样式。ClipEditor 读取其中的文本内容，让你先检查和整理，再将结果以纯文本形式复制回剪贴板，方便粘贴到目标应用中。
 
-除了去除富文本样式，ClipEditor 还提供缩进、空格与换行整理、列表前缀清理、查找替换及临时历史标签等功能，减少逐行修改和反复复制粘贴的工作量。
+除了去除富文本样式，ClipEditor 还提供截图 OCR、多语言图片识字、缩进、空格与换行整理、列表前缀清理、查找替换及临时历史标签等功能。也可以锁定常用处理步骤，让新复制的文字或图片识别结果按顺序自动整理并写回剪贴板，减少重复操作。
 
 例如，你从 ChatGPT 复制了一段代码，需要将它嵌入现有代码块，并在每行前额外增加四个空格。与其逐行手动输入，只需将内容载入 ClipEditor，点击“每行行首加 4 空格”，再复制结果即可。
 
 > 纯文本提取去除的是剪贴板中的富文本样式，不会自动删除文字本身包含的 Markdown 标记，例如 `**`、`#` 或代码围栏，也不会自动检查代码语法。
+
+### 快速上手
+
+1. **处理文字**：复制一段内容，点击“从剪贴板导入”，在文本框检查或修改，然后使用替换、空格、换行或缩进工具，最后复制结果。
+2. **识别屏幕文字**：让 ClipEditor 窗口处于活动状态，点击左侧 OCR 截图按钮，或按 `F5`、`F6`、`F7`、`F8` 中任意一个键，拖动框选文字区域。按 `Esc` 或右键可取消框选。
+3. **识别其他软件的截图**：将截图以图片数据放入剪贴板，再手动导入；开启实时监听后会自动识别，文字显示到编辑区并写回剪贴板。
+4. **重复同一处理流程**：选择自动处理模式，按需要的执行顺序锁定“全部替换”、删除空白行等工具，再复制文字或截图。程序会完成处理并将最终结果送回剪贴板。
+
+OCR 默认使用快速模式。识别其他语言时选择相应的 OCR 语言；需要对比识别效果时切换高精度模式。识别过程中可以查看阶段和耗时，也可以取消任务。
 
 ### 主要功能与适用场景
 
@@ -39,7 +48,7 @@ ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主�
 
 将内容导入 ClipEditor 后，点击“复制全部内容”或“复制选中内容”，即可将文本重新写入剪贴板。纯文本粘贴后的外观仍由目标应用决定。
 
-仅导入内容，不会自动把系统剪贴板改写为纯文本；需要主动复制，或在直接修改剪贴板模式下执行处理操作。
+手动导入普通文本本身不会将系统剪贴板改写为纯文本；需要主动复制，或执行相应的处理操作。自动处理模式会对监听到的内容执行锁定流程。剪贴板图片经 OCR 成功提取文字后，会将文字写回剪贴板，替换原图片。
 
 #### 2. 可编辑文本框与内容统计
 
@@ -55,12 +64,59 @@ ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主�
 
 | 功能 | 设计初衷与典型场景 |
 | --- | --- |
-| 从剪贴板导入 | 按自己的节奏读取下一段内容。适合关闭实时监听后，避免外部复制操作打断编辑。 |
+| 从剪贴板导入 | 按自己的节奏读取文本或识别剪贴板图片。适合关闭实时监听后，避免外部复制操作打断编辑。 |
 | 复制全部内容 | 将完整结果以纯文本形式写入剪贴板。适合把整理完成的回答、文档或代码一次性粘贴到目标位置。 |
 | 复制选中内容 | 只复制当前选中的文字。适合从 ChatGPT 的长回答中提取一个段落、几句话或一段代码。 |
 | 清空剪贴板 | 主动移除当前系统剪贴板内容，减少后续误粘贴的可能。它不等于安全擦除，也不保证清除 Windows 剪贴板历史。 |
 
-#### 4. 空格与换行整理
+开启实时监听后，可使用 Windows 截图工具、`PrtSc` 或其他截图软件，将截图以**图片数据**放入系统剪贴板。ClipEditor 检测到图片后会进行识别，显示识别文字，并将文字写回剪贴板，随后可在目标应用中直接粘贴。
+
+`PrtSc` 的具体行为取决于 Windows 和截图工具设置；需要先完成截图并确保图片已经进入剪贴板。仅复制图片文件的路径或文件对象，不等同于复制图片数据。
+
+不使用实时监听时，可以通过原有的剪贴板导入按钮手动导入图片进行识别。启动时的剪贴板导入同样可以处理已有图片。
+
+#### 4. 截图 OCR 与屏幕文字提取
+
+**设计初衷：将无法直接选中的屏幕文字转为可以编辑、查找、替换和复制的文本。**
+
+适合提取软件界面、网页图片、扫描文档当前显示区域中的文字。
+
+- 点击左侧的 OCR 截图按钮，拖动鼠标框选需要识别的屏幕区域。
+- ClipEditor 窗口处于活动状态时，按 `F5`、`F6`、`F7` 或 `F8` 均可启动同一个截图功能。
+- 四个按键的作用相同，不分别对应不同语言或识别模式。
+- 框选时按 `Esc` 或点击鼠标右键，可取消截图。
+- 完成框选后，程序调用本地 OCR 引擎识别，并将文字载入文本框和临时历史标签。
+
+这些是窗口内快捷键，程序不将它们注册为系统全局快捷键。如果其他软件的全局快捷键拦截了某个按键，可使用另外一个按键，或直接点击截图按钮。
+
+OCR 输出为纯文本，不会恢复原图片的完整排版。选择清晰、完整的文字区域有助于识别；代码、数字和重要内容应核对后使用。
+
+#### 5. OCR 语言与识别速度
+
+OCR 语言与软件界面语言分别设置。可以保持中文界面，同时选择英文、韩文或其他已打包语言进行识别；OCR 语言选择会被记住。
+
+常用语言包覆盖简体中文、繁体中文、英语、日语、韩语、法语、德语、西班牙语、意大利语、葡萄牙语、荷兰语、波兰语、俄语、乌克兰语、格鲁吉亚语、希腊语、泰语、越南语、印度尼西亚语、马来语、阿拉伯语、波斯语、印地语、泰米尔语、泰卢固语和土耳其语。
+
+默认的中文组合用于简繁中文、英文和日文内容。处理其他语言时，请在 OCR 语言框选择对应语言。多个语言可以共用一套识别模型；包含多语言模型不表示程序会对每张图片依次运行所有语言，也不等于自动判断任意语言。实际可用范围以完整发行包中包含的模型为准。
+
+- **快速**：默认选项，使用较轻量的检测模型；默认中文组合也使用轻量识别模型，适合日常屏幕截图。
+- **高精度**：使用该语言配置的另一套模型组合，可用于与快速模式对比识别效果，通常需要更多计算资源。
+
+识别引擎在首次任务时启动，完成后保持运行，供后续任务复用。程序最多缓存两套最近使用的模型组合，共用模型的语言可以复用同一个引擎实例，减少重复加载。
+
+首次识别仍需要准备缓存、启动引擎并加载模型，可能比后续识别慢。切换到未缓存的模型、取消任务后重新识别或重启软件，也可能再次加载。常驻引擎会保留一定内存；实际耗时取决于电脑配置、图片尺寸、文字数量及所选模型，不保证固定耗时或高精度模式对每张图片都更准确。
+
+#### 6. OCR 进度、取消与结果保护
+
+识别期间，界面会显示“正在启动本地引擎”“正在加载模型”或“正在识别”等阶段，以及已用时间、滚动进度条和取消按钮。滚动进度条表示任务仍在运行，不代表精确完成百分比。
+
+- 点击取消，可终止当前 OCR 任务；下一次识别会重新启动引擎。
+- 识别完成、未识别到文字、失败或取消后，状态区域会保留相应提示。
+- 未识别到文字时保留原内容，不用空结果覆盖编辑区。
+- 如果识别完成时发现剪贴板、编辑文字、历史标签、处理模式或锁定的自动处理步骤已经变化，会丢弃过期结果，避免覆盖较新的内容。
+- 关闭 ClipEditor 时，会结束其启动的常驻 OCR 引擎。
+
+#### 7. 空格与换行整理
 
 | 功能 | 设计初衷与典型场景 |
 | --- | --- |
@@ -77,7 +133,7 @@ ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主�
 - 对 Python 等依赖缩进的代码，去掉行首空白可能破坏代码结构。
 - 合并段内换行不会自动理解文章或代码，应检查处理结果。
 
-#### 5. 列表前缀与符号清理
+#### 8. 列表前缀与符号清理
 
 **设计初衷：清理复制展示内容时一起带来的编号、前缀和提示符，保留真正需要的正文。**
 
@@ -94,7 +150,7 @@ ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主�
 
 连字符可能属于负数或命令参数，箭头符号也可能是有效代码。处理代码和重要数据前，请保留原始副本。
 
-#### 6. 行号与字母大小写转换
+#### 9. 行号与字母大小写转换
 
 | 功能 | 设计初衷与典型场景 |
 | --- | --- |
@@ -105,7 +161,7 @@ ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，主�
 
 大小写转换不会判断品牌写法、缩写或标题语法。代码、网址、密码及其他区分大小写的内容不应随意转换。
 
-#### 7. 行首增加 2、4、8 或 12 个空格
+#### 10. 行首增加 2、4、8 或 12 个空格
 
 **设计初衷：快速调整整段文本的嵌入层级，避免逐行手动增加缩进。**
 
@@ -134,7 +190,7 @@ def greet():
 
 这是整体增加缩进，不是将所有行强制调整为四个空格。重复执行会继续增加空格，程序不会自动判断代码应该属于哪个层级。
 
-#### 8. 独立查找与全部替换
+#### 11. 独立查找与全部替换
 
 **查找下一个：先定位内容，而不必修改它。**
 
@@ -191,13 +247,13 @@ def greet():
 - 如果整个替换框为空，所有匹配到的查找项都会被删除。
 - `&&&` 是多组内容的专用分隔符。
 
-#### 9. 临时历史标签
+#### 12. 临时历史标签
 
 **设计初衷：方便在一次工作过程中比较和切换多次载入的内容，而不是建立长期剪贴板数据库。**
 
 例如，连续从 ChatGPT 复制几个版本的回答或代码后，可以通过标签回看上一版，不必返回网页重新寻找和复制。
 
-- 新载入的剪贴板文本会建立标签，之前的内容仍可访问。
+- 新载入的剪贴板文本及成功接收的 OCR 文字会建立标签，之前的内容仍可访问。
 - 点击标签，将对应内容显示到主文本框，不自动复制到剪贴板。
 - 编辑当前文本框，也会更新当前标签中的内容；标签不是不可修改的快照。
 - 点击右侧的 `×` 可以删除记录，关闭区域与切换区域分离。
@@ -207,15 +263,15 @@ def greet():
 
 历史标签用于临时查阅，不应作为重要内容的唯一备份。
 
-#### 10. 中英文界面与设置记忆
+#### 13. 中英文界面与设置记忆
 
 **设计初衷：让用户选择熟悉的界面语言，并减少每次启动后的重复设置。**
 
-支持简体中文与英文切换。界面语言、处理模式及剪贴板监听模式通过当前用户的注册表设置保存，下次启动时恢复上次选择。
+支持简体中文与英文切换。界面语言、处理模式、剪贴板监听模式及 OCR 语言通过当前用户的注册表设置保存，下次启动时恢复上次选择。OCR 语言与界面语言分别选择；快速/高精度选项在启动时默认为快速。
 
 这一设置机制不用于保存文本或历史标签内容。
 
-#### 11. 换行兼容与窗口操作
+#### 14. 换行兼容与窗口操作
 
 - 支持 Windows 的 CRLF、Linux/macOS 的 LF、旧式 Mac 的 CR，以及部分 Unicode 换行字符；载入显示时统一为 Windows 换行。
 - 文本框随窗口大小占用工具区域上方的剩余空间，较长文本通过滚动条查看。
@@ -228,7 +284,7 @@ def greet():
 
 ### 各个模式的设计初衷
 
-处理模式决定“处理后是否自动写回剪贴板”，监听模式决定“是否自动导入新的剪贴板内容”。两者互相独立。
+处理模式决定文本整理和内部截图识别后如何处理结果，监听模式决定是否自动导入后续剪贴板内容。两者通常互相独立。剪贴板图片识别成功后，在各处理模式下都会将识别文字写回剪贴板；自动处理模式写回的是执行锁定步骤后的最终文字。
 
 > 自动处理模式是例外：选择该模式时会自动启用实时监听，并暂时锁定监听模式选项，以便对新复制的文字立即执行已锁定操作。
 
@@ -236,7 +292,7 @@ def greet():
 
 适合需要逐步处理、比较结果或手动修改内容的情况。
 
-执行处理操作后，结果留在文本框中，不自动覆盖剪贴板。可以继续调整，最后选择复制全部或只复制选中内容。
+执行文本处理操作或在 ClipEditor 内部截图识字后，结果留在文本框中，不自动覆盖剪贴板。可以继续调整，最后选择复制全部或只复制选中内容。导入或监听到的剪贴板图片则会在识别成功后用文字替换原图片，方便直接粘贴。
 
 例如，从 Word 复制段落后，先去掉多余空行，再修改几句话，确认完成后才复制到目标文档。
 
@@ -244,17 +300,17 @@ def greet():
 
 适合明确知道需要执行什么处理，希望快速完成“导入 → 处理 → 粘贴”的情况。
 
-执行文本整理或替换操作后，程序自动将完整结果写回剪贴板，无需再点击“复制全部”。
+执行文本整理、替换操作或完成 OCR 识别后，程序自动将完整结果写回剪贴板，无需再点击“复制全部”。
 
 例如，从 ChatGPT 复制代码，点击“每行行首加 4 空格”，随后即可去目标编辑器粘贴。
 
-此模式不会在每次键盘输入时自动同步，也不会仅因导入文本或切换历史标签就自动写回剪贴板。只需要转为纯文本、不执行其他处理时，可以使用“复制全部”。
+此模式不会在每次键盘输入时自动同步，也不会仅因导入普通文本或切换历史标签就自动写回剪贴板。只需要转为纯文本、不执行其他处理时，可以使用“复制全部”。
 
 清空文本的处理操作在此模式下也可能同步清空剪贴板。
 
 #### 自动处理模式：复制后按锁定顺序完成一组固定操作
 
-适合需要反复复制不同文本，并对每段文本执行相同处理流程的情况。
+适合需要反复复制不同文本、连续截图识字，并对每段内容执行相同处理流程的情况。收到图片时先进行 OCR，再按锁定顺序处理识别文字；没有锁定步骤时，直接显示并复制识别文字。
 
 进入自动处理模式后，可以点击“全部替换”或文本处理区域中的按钮进行锁定：
 
@@ -272,7 +328,7 @@ def greet():
 
 适合把 ClipEditor 当作临时编辑器使用。
 
-启动时读取一次剪贴板，之后即使在其他应用中复制了新内容，编辑区也不会自动切换。需要处理下一段内容时，再点击导入按钮。
+启动时读取一次剪贴板中的文本或识别其中的图片，之后即使在其他应用中复制了新内容，也不会自动导入。需要处理下一段文本或下一张图片时，再点击导入按钮；内部 OCR 截图按钮仍可随时使用。
 
 设计重点是避免外部复制操作打断当前编辑过程。
 
@@ -280,11 +336,13 @@ def greet():
 
 适合频繁从 Word、ChatGPT 或网页复制不同段落，希望省去每次手动导入操作的情况。
 
-剪贴板变化时，程序会自动读取新内容，并通过临时历史标签提供对之前内容的访问。剪贴板清空或变为非文本内容时，编辑区也会清空。
+剪贴板变化时，程序会自动导入文本；如果是图片数据，则交给 OCR 识别，并将成功识别的文字显示、写回剪贴板。两类文字都可以通过临时历史标签回看。剪贴板清空或变为既非文本也非可识别图片的内容时，编辑区会清空。图片未识别到文字时保留原内容，并显示提示。
 
 设计重点是提高连续处理效率。但外部剪贴板变化可能切换当前显示内容，因此进行较长的手动编辑时，更适合使用“仅启动时导入”。
 
 #### 如何组合两类模式
+
+普通文本的常用组合如下：
 
 | 组合 | 适合的工作方式 |
 | --- | --- |
@@ -293,7 +351,15 @@ def greet():
 | 常规处理＋实时监听 | 连续导入不同内容，但由自己决定何时、复制哪些结果。 |
 | 直接修改剪贴板＋实时监听 | 连续复制、快速处理、直接粘贴，减少导入和复制按钮操作。 |
 
-实时监听与直接修改剪贴板组合，并不等于“复制任何内容后立即自动转换并写回纯文本”。自动导入后，仍需执行处理操作或主动复制。
+对于普通文本，实时监听与直接修改剪贴板组合并不等于复制后立即自动转换并写回纯文本；导入后仍需执行处理操作或主动复制。剪贴板图片识别成功后则会自动写回文字。
+
+OCR 的结果去向如下：
+
+| 处理模式 | ClipEditor 内部截图 | 导入或监听到的剪贴板图片 |
+| --- | --- | --- |
+| 常规处理 | 识别文字进入文本框和历史标签；检查后手动复制。 | 识别文字进入文本框和历史标签，并写回剪贴板，替换原图片。 |
+| 直接修改剪贴板 | 识别文字显示在编辑区，并自动写回剪贴板。 | 识别文字显示在编辑区，并自动写回剪贴板。 |
+| 自动处理 | 识别后按锁定顺序执行文本处理步骤，将最终结果显示并写回剪贴板。 | 收到图片后先识别，再执行锁定步骤，将最终结果显示并写回剪贴板。 |
 
 > 文本处理按钮通常作用于整个主文本框。“复制选中内容”只限定复制范围，不代表其他处理按钮只处理选中的文字。
 
@@ -303,6 +369,18 @@ def greet():
 2. 如果已有可执行版本，下载对应的 Windows 发行压缩包，而不是 GitHub 自动生成的 `Source code (zip)`。
 3. 解压所有文件，运行其中的 `ClipEditor.exe`，并保留发行包附带的依赖和配置文件。
 4. 安装该版本发行说明要求的 .NET 或 .NET Framework 运行环境（如果需要）。
+
+**客户不需要安装 Python。** OCR 功能需要主程序旁边的完整 `PaddleOCR` 文件夹，不能只复制其中一个 EXE。
+
+| 相对 `ClipEditor.exe` 的路径 | 用途 |
+| --- | --- |
+| `PaddleOCR/ClipEditorOCR.exe` | 本地 OCR 引擎。 |
+| `PaddleOCR/_internal/` | 引擎附带的运行时和依赖，需完整保留。 |
+| `PaddleOCR/model_cache/` | 随发行包提供的语言模型，需完整保留。 |
+| `PaddleOCR/model_manifest.json` | 语言及快速/高精度模型映射，需保留。 |
+| `PaddleOCR/build-versions.txt` | 构建依赖版本记录，建议保留以便排错。 |
+
+截图识别在本机执行，不需要将图片上传到在线 OCR 服务。完整模型随发行包提供后可离线识别；运行时缺少模型会显示错误，需要补齐完整发行包。首次运行可能将随包模型复制到可写缓存目录，因此还需要相应的磁盘空间。
 
 若尚未提供可执行发行包，请按照下方步骤从源码编译。
 
@@ -323,26 +401,28 @@ def greet():
 
 源码应包含 `.sln`、`.csproj`、`.cs`、`.resx` 以及项目引用的资源，不应只包含代码粘贴文本。
 
-发布前，请在独立文件夹中测试，最好再在未安装 Visual Studio 的 Windows 环境中验证。不要假设只复制一个 EXE 就包含全部运行依赖。
+如果需要构建 OCR 功能，还需运行源码包中的 `PaddleOCR/build_ocr_exe.cmd`。该脚本使用 Python 3.10 x64 准备依赖和语言模型，并生成独立 OCR 引擎。等待 `BUILD AND FROZEN SELF-TEST PASSED` 后，将生成的整个 `dist/ClipEditorOCR` 文件夹改名为 `PaddleOCR`，放到主程序旁。构建阶段需要联网；客户不需要安装 Python，也不需要开发者的 `.venv` 文件夹。更新常驻 OCR 协议时，应同时重新生成主程序和 OCR 引擎。
+
+发布前，请在独立文件夹中测试，最好再在未安装 Visual Studio 和 Python 的 Windows 环境中验证。不要假设只复制一个 EXE 就包含全部运行依赖。
 
 ### 设置与隐私
 
-界面语言、处理模式和监听模式保存在当前用户的注册表位置：
+界面语言、处理模式、监听模式和 OCR 语言保存在当前用户的注册表位置：
 
 ```text
 HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 ```
 
-设置值为 `UiLanguage`、`ProcessingMode` 和 `ClipboardWatchMode`。这些设置不用于保存文本或历史标签内容。
+设置值包括 `UiLanguage`、`ProcessingMode`、`ClipboardWatchMode` 和 `OcrLanguage`。这些设置不用于保存文本或历史标签内容。
 
-当前实现的文本处理在本机进行，不提供文本上传或云端历史功能。点击“开发者其他软件和应用”会调用默认浏览器打开下方 Steam 页面；浏览器和 Steam 有各自的数据处理规则。
+文本处理和 OCR 识别在本机进行，不提供文本上传或云端历史功能，也不需要将截图上传到在线 OCR 服务。OCR 会使用本地临时图片文件，并可能将模型复制到可写缓存目录；这与文本历史仅保存在内存中的机制不同。点击“开发者其他软件和应用”会调用默认浏览器打开下方 Steam 页面；浏览器和 Steam 有各自的数据处理规则。
 
 该按钮的实际地址随界面语言变化：简体中文界面打开 Steam 简体中文搜索页面，英文界面打开原英文搜索页面。“最新版”按钮则调用默认浏览器打开 ClipEditor 的 GitHub 页面。
 
 注意：
 
 - 剪贴板可能包含密码、身份信息或其他敏感内容，开启实时监听前请了解这一行为。
-- 直接修改剪贴板模式会覆盖系统剪贴板中的原有内容。
+- 直接修改剪贴板模式和自动处理模式会写回处理结果；剪贴板图片识别成功后也会被文字替换，包括在常规模式下。
 - 临时历史不是备份，删除标签、超过标签上限或退出程序可能导致内容无法从本软件中恢复。
 - 不提供安全擦除保证；不保存历史文件不意味着敏感数据绝不可能存在于系统剪贴板历史、分页文件或其他软件中。
 - 处理重要文档、代码或数据前，请保留原始副本并检查结果。
@@ -351,7 +431,7 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 欢迎通过本仓库的 **Issues** 报告问题，或通过 **Pull Requests** 提交改进。
 
-报告问题时，请提供 Windows 版本、显示缩放比例、软件版本、所选模式、复现步骤，以及不包含隐私信息的示例文本。
+报告问题时，请提供 Windows 版本、显示缩放比例、软件版本、所选模式、复现步骤，以及不包含隐私信息的示例文本或图片。OCR 问题还请注明识别语言、快速/高精度选项和状态区提示。
 
 请勿在公开 Issue、截图或日志中提交真实密码、密钥或敏感剪贴板内容。
 
@@ -379,17 +459,26 @@ HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 
 ### About ClipEditor
 
-ClipEditor is a Windows desktop application built with C# and Windows Forms for extracting, editing, and preprocessing clipboard text before pasting it into another application.
+ClipEditor is a Windows desktop application built with C# and Windows Forms for extracting clipboard text, recognizing text in screenshots and clipboard images, and editing or processing the results before pasting them elsewhere. OCR uses a local PaddleOCR engine; customers using the complete release package do not need Python installed.
 
 Content copied from Word, PDF, ChatGPT webpages, and other websites can include rich-text formatting alongside the text itself. Pasting it directly may bring unwanted fonts, sizes, colors, backgrounds, or other styles into your destination document.
 
 ClipEditor reads the text representation, lets you inspect and prepare it, and writes the result back as plain text when you copy it. The destination application determines how the pasted plain text appears.
 
-It also provides indentation, whitespace and line-break cleanup, supported list-prefix removal, find and replace, and temporary history tabs to reduce repetitive editing.
+It provides multilingual screenshot OCR, indentation, whitespace and line-break cleanup, supported list-prefix removal, find and replace, and temporary history tabs. Lock frequently used operations to automatically process newly copied text or recognized image text in sequence and write the result back to the clipboard.
 
 For example, if code copied from ChatGPT needs four additional spaces at the beginning of each line before being inserted into an existing code block, you can apply the indentation operation instead of editing every line manually.
 
 > Plain-text extraction removes rich-text clipboard formatting. It does not automatically remove literal Markdown characters such as `**`, `#`, or code fences, and it does not validate code syntax.
+
+### Quick start
+
+1. **Process text:** copy some text, import it, review or edit it, apply replacement or cleanup tools, then copy the result.
+2. **Recognize screen text:** activate ClipEditor, click the OCR screenshot button or press any of `F5`, `F6`, `F7`, or `F8`, then drag to select a region. Press `Esc` or right-click to cancel selection.
+3. **Recognize another application's screenshot:** place image data on the clipboard and import it manually, or enable live monitoring to recognize it automatically. The text appears in the editor and replaces the clipboard image.
+4. **Repeat a workflow:** select Automatic processing, lock tools such as Replace all and Remove blank lines in the required order, then copy text or take screenshots. ClipEditor processes the content and copies the final result.
+
+OCR starts with the Fast profile. Select the OCR language for your content and try High accuracy when you want to compare results. During recognition, view the current stage and elapsed time or cancel the task.
 
 ### Features and practical use cases
 
@@ -406,7 +495,7 @@ Useful when:
 
 Import the content, then use **Copy all** or **Copy selection** to write plain text to the clipboard.
 
-Importing alone does not rewrite the system clipboard. You must copy the result or perform a processing operation in direct clipboard mode.
+Manually importing ordinary text does not itself rewrite the clipboard. Copy the result or perform a processing operation as appropriate. Automatic mode runs the locked workflow on monitored content. Successful clipboard-image OCR writes recognized text back, replacing the image.
 
 #### 2. Editable text area and statistics
 
@@ -420,12 +509,59 @@ There is no fixed editor character limit, but large text and multiple history en
 
 | Function | Purpose and typical use |
 | --- | --- |
-| Import clipboard text | Load the next item when you are ready, particularly when live monitoring is disabled. |
+| Import clipboard content | Load text or recognize a clipboard image when you are ready, particularly when live monitoring is disabled. |
 | Copy all | Copy the complete prepared document, answer, or code snippet as plain text. |
 | Copy selection | Extract only a paragraph, a few sentences, or a code block from longer content. |
 | Clear clipboard | Remove current clipboard contents to reduce accidental pasting. This is not secure erasure and does not guarantee removal from Windows clipboard history. |
 
-#### 4. Spaces and line breaks
+With live monitoring enabled, use Windows capture tools, `PrtSc`, or another screenshot application to place **image data** on the clipboard. ClipEditor recognizes the image, displays the text, and writes the text back to the clipboard, ready to paste elsewhere.
+
+The behavior of `PrtSc` depends on Windows and screenshot-tool settings. Finish the capture and ensure the image reaches the clipboard. Copying an image file object or its path is not the same as copying image data.
+
+Without live monitoring, use the existing clipboard import button to recognize an image manually. Startup clipboard import can also recognize an image already on the clipboard.
+
+#### 4. Screenshot OCR and screen text extraction
+
+**Purpose: turn text that cannot be selected directly into editable, searchable, replaceable, and copyable text.**
+
+Use it for application interfaces, webpage images, or the visible area of a scanned document.
+
+- Click the OCR screenshot button on the left and drag to select a screen region.
+- While ClipEditor is the active window, press `F5`, `F6`, `F7`, or `F8` to start the same capture function.
+- All four keys perform the same action; they do not select different languages or recognition profiles.
+- Press `Esc` or right-click during selection to cancel the capture.
+- After selection, the local engine recognizes the image and loads its text into the editor and temporary history.
+
+ClipEditor does not register these keys as system-wide hotkeys. If another application's global hotkey intercepts one of them, use another listed key or click the screenshot button.
+
+OCR produces plain text rather than reconstructing the full original layout. Capture clear, complete text regions and review important text, numbers, and code before using them.
+
+#### 5. OCR languages and recognition speed
+
+The OCR language is separate from the interface language, and the selected OCR language is remembered. For example, keep the interface in Chinese while recognizing English or Korean text.
+
+The common language package covers Simplified Chinese, Traditional Chinese, English, Japanese, Korean, French, German, Spanish, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Georgian, Greek, Thai, Vietnamese, Indonesian, Malay, Arabic, Persian, Hindi, Tamil, Telugu, and Turkish.
+
+The default Chinese combination is intended for Simplified/Traditional Chinese, English, and Japanese content. Select the corresponding OCR language for other text. Several languages may share a recognition model. Bundling multiple languages does not mean running every language model on every image or automatically identifying any language. Availability depends on the models included in the complete release package.
+
+- **Fast** is the default. It uses a lighter detection model and a lighter recognizer for the default Chinese combination, suitable for everyday screenshots.
+- **High accuracy** uses the alternative model combination configured for the selected language. Compare its results with Fast when needed; it generally requires more computation.
+
+The engine starts for the first task and stays running for later requests. Up to two recently used model combinations are cached, and languages sharing the same models can reuse one engine instance.
+
+The first recognition still involves cache preparation, engine startup, and model loading. Selecting an uncached model, retrying after cancellation, or restarting the application can require loading again. Keeping the engine running uses memory. Timing depends on hardware, image size, text density, and model choice; neither a fixed processing time nor better results on every image are guaranteed.
+
+#### 6. OCR status, cancellation, and result protection
+
+During OCR, the interface shows stages such as starting the local engine, loading models, and recognizing text, together with elapsed time, an animated progress indicator, and a Cancel button. The animation indicates activity, not an exact completion percentage.
+
+- Cancel stops the current task; the next recognition restarts the engine.
+- Completion, no-text, failure, and cancellation messages remain visible in the status area.
+- A no-text result preserves existing content rather than replacing the editor with an empty result.
+- Results are discarded if the clipboard, editor text, selected history tab, processing mode, or locked automatic workflow has changed by completion, helping preserve newer content.
+- Closing ClipEditor terminates the resident OCR engine it started.
+
+#### 7. Spaces and line breaks
 
 | Function | Purpose and typical use |
 | --- | --- |
@@ -439,7 +575,7 @@ There is no fixed editor character limit, but large text and multiple history en
 
 Spaces, blank lines, and indentation can be meaningful. In indentation-sensitive languages such as Python, trimming line starts can break code structure. Paragraph joining does not understand document or code semantics; review the result.
 
-#### 5. List prefixes and symbols
+#### 8. List prefixes and symbols
 
 **Purpose: remove supported numbering, prefixes, or prompts that were copied along with displayed content.**
 
@@ -456,7 +592,7 @@ These functions recognize supported forms, not every possible heading or list fo
 
 Dashes may be part of negative numbers or command arguments, and arrows may be valid code. Keep originals before applying these operations to code or important data.
 
-#### 6. Line numbers and capitalization
+#### 9. Line numbers and capitalization
 
 | Function | Purpose and typical use |
 | --- | --- |
@@ -467,7 +603,7 @@ Dashes may be part of negative numbers or command arguments, and arrows may be v
 
 Case conversion does not understand brand names, acronyms, or title grammar. Avoid applying it indiscriminately to case-sensitive code, URLs, passwords, or data.
 
-#### 7. Add 2, 4, 8, or 12 leading spaces
+#### 10. Add 2, 4, 8, or 12 leading spaces
 
 **Purpose: shift a complete text block to an additional indentation level without editing every line.**
 
@@ -482,7 +618,7 @@ The selected number of ordinary spaces is added to every non-empty line. Existin
 
 This adds indentation; it does not reset every line to the selected width. Repeating the operation adds more spaces. The application does not infer the correct code nesting level.
 
-#### 8. Independent find and replace
+#### 11. Independent find and replace
 
 **Find next** locates content without modifying it. Use the button or press `Enter` in the search field to find keywords, variable names, or specific text.
 
@@ -533,13 +669,13 @@ When using multiple rules:
 - If the entire Replace box is empty, every matched find item is deleted.
 - `&&&` is the reserved separator for multiple items.
 
-#### 9. Temporary history tabs
+#### 12. Temporary history tabs
 
 **Purpose: revisit and compare content during one working session rather than maintain a permanent clipboard database.**
 
 Useful when copying several versions of a ChatGPT answer or code snippet and wanting to return to an earlier one.
 
-- New imported clipboard text receives a tab.
+- Newly imported clipboard text and accepted OCR results receive a tab.
 - Selecting a tab displays its text without automatically copying it.
 - Editing the text also updates the selected entry; tabs are not immutable snapshots.
 - Use the tab's `×` button to delete it. Closing and switching areas are separate.
@@ -549,15 +685,15 @@ Useful when copying several versions of a ChatGPT answer or code snippet and wan
 
 Temporary history is not a backup.
 
-#### 10. Languages and remembered preferences
+#### 13. Languages and remembered preferences
 
 **Purpose: use a familiar interface without repeating setup at every launch.**
 
-Switch between Simplified Chinese and English. The language, processing mode, and monitoring mode are remembered through current-user registry settings.
+Switch between Simplified Chinese and English. The interface language, processing mode, monitoring mode, and OCR language are remembered through current-user registry settings. OCR language is selected independently from interface language; the recognition profile defaults to Fast at startup.
 
 This mechanism does not save editor text or history entries.
 
-#### 11. Line endings and window behavior
+#### 14. Line endings and window behavior
 
 - Normalize Windows CRLF, Linux/macOS LF, legacy Mac CR, and supported Unicode line separators for Windows display.
 - The editor fills the remaining area above the processing controls and uses scrollbars for longer text.
@@ -570,7 +706,7 @@ This mechanism does not save editor text or history entries.
 
 ### Modes and their design goals
 
-Processing settings determine whether results are written back automatically. Monitoring settings determine whether new clipboard content is imported automatically. These settings are independent.
+Processing settings control how text operations and internal screenshot results are handled. Monitoring settings control whether later clipboard content is imported automatically. These settings are usually independent. Successful clipboard-image OCR writes text back in every processing mode; Automatic mode writes the final text after its locked steps.
 
 > Automatic processing is the exception: selecting it enables live monitoring and temporarily locks the monitoring choices so newly copied text can immediately run through the locked actions.
 
@@ -578,7 +714,7 @@ Processing settings determine whether results are written back automatically. Mo
 
 Use this mode for step-by-step cleanup, manual editing, or checking results before replacing clipboard contents.
 
-Processing results stay in the editor. Copy the complete result or a selection when you are satisfied.
+Text-processing results and OCR results from captures inside ClipEditor stay in the editor. Copy the complete result or a selection when you are satisfied. Imported or monitored clipboard images are an exception: successful OCR replaces the clipboard image with text, ready to paste.
 
 Example: import a Word paragraph, remove unnecessary blank lines, revise the wording, then copy it to your destination document.
 
@@ -586,7 +722,7 @@ Example: import a Word paragraph, remove unnecessary blank lines, revise the wor
 
 Use this mode when you know the required operation and want a quick import → process → paste workflow.
 
-Text-processing and replacement operations automatically write the complete result to the clipboard.
+Text-processing operations, replacements, and completed OCR tasks automatically write the complete result to the clipboard.
 
 Example: copy code from ChatGPT, add four leading spaces, then paste directly into your editor without clicking Copy all.
 
@@ -596,7 +732,7 @@ Clearing the editor through a processing operation can also clear the clipboard 
 
 #### Automatic processing: run a locked workflow after every copy
 
-Use this mode when you repeatedly copy different text and want every item to follow the same processing workflow.
+Use this mode when repeatedly copying text or recognizing screenshots that should follow the same processing workflow. Images are recognized first, then the locked actions run in order. With no actions locked, recognized text is displayed and copied directly.
 
 In Automatic mode, click **Replace all** or any button in the text-processing area to lock or unlock it:
 
@@ -612,28 +748,38 @@ When **Replace all** is locked, the application stores the Find and Replace rule
 
 #### Startup-only import: keep editing stable
 
-The application reads the clipboard once at startup and does not automatically follow later changes.
+The application imports text or recognizes a clipboard image once at startup and does not automatically import later changes. The internal OCR screenshot button remains available.
 
-Use it as a temporary editor without having your current content switched by copying something in another application. Import the next item manually when ready.
+Use it as a temporary editor without having your current content switched by copying something in another application. Import the next text item or image manually when ready.
 
 #### Live monitoring: process repeated copying efficiently
 
 Use this mode when repeatedly copying content from Word, ChatGPT, or webpages.
 
-Clipboard changes trigger automatic reading of new content, with earlier entries available through temporary tabs. Empty or non-text clipboard content also clears the editor.
+Clipboard changes import text or send image data to OCR. Successfully recognized text is displayed and written back to the clipboard. Both kinds of text use temporary history tabs. Empty clipboard content, or content containing neither text nor a supported image, clears the editor. A no-text OCR result preserves existing content and displays a message.
 
 External clipboard changes can switch the displayed entry. For longer uninterrupted manual editing, choose startup-only import.
 
 #### Combining the settings
+
+Common combinations for ordinary text:
 
 | Combination | Suggested workflow |
 | --- | --- |
 | Normal + startup-only | Carefully edit one item, then copy manually. |
 | Direct + startup-only | Keep the current item stable and paste immediately after processing. |
 | Normal + live monitoring | Import successive items automatically while deciding what and when to copy. |
-| Direct + live monitoring | Repeatedly copy, process, and paste with fewer fewer import and copy-button actions. |
+| Direct + live monitoring | Repeatedly copy, process, and paste with fewer import and copy-button actions. |
 
-Live monitoring combined with direct processing is not an automatic plain-text clipboard passthrough. After import, you still need to perform an operation or explicitly copy the text.
+For ordinary text, live monitoring combined with direct processing is not an automatic plain-text clipboard passthrough: after import, perform an operation or explicitly copy the text. Successful clipboard-image recognition automatically writes its text back.
+
+OCR results are handled as follows:
+
+| Processing mode | Capture inside ClipEditor | Import or monitor a clipboard image |
+| --- | --- | --- |
+| Normal | Load recognized text into the editor and history; copy manually after reviewing. | Load recognized text into the editor and history, and replace the clipboard image with text. |
+| Direct clipboard | Display recognized text and automatically write it to the clipboard. | Display recognized text and automatically write it to the clipboard. |
+| Automatic | Recognize, run locked text-processing steps in order, then display and copy the final result. | Recognize the incoming image, run locked steps in order, then display and copy the final result. |
 
 > Processing buttons generally operate on the entire editor. Copy selection limits the copying scope, not the scope of other processing operations.
 
@@ -643,6 +789,18 @@ Live monitoring combined with direct processing is not an automatic plain-text c
 2. If available, download the Windows release package, not GitHub's automatically generated `Source code (zip)`.
 3. Extract the complete package and run `ClipEditor.exe`, keeping dependencies and configuration files together.
 4. Install the runtime specified by that release, if required.
+
+**Customers do not need Python installed.** Keep the complete `PaddleOCR` folder beside `ClipEditor.exe`.
+
+| Path relative to `ClipEditor.exe` | Purpose |
+| --- | --- |
+| `PaddleOCR/ClipEditorOCR.exe` | Local OCR engine. |
+| `PaddleOCR/_internal/` | Bundled runtime and dependencies; keep the entire folder. |
+| `PaddleOCR/model_cache/` | Bundled language models; keep the entire folder. |
+| `PaddleOCR/model_manifest.json` | Required language and recognition-profile mapping. |
+| `PaddleOCR/build-versions.txt` | Build dependency versions; recommended for troubleshooting. |
+
+Recognition runs locally without uploading screenshots to an online OCR service. A complete release containing the required models can recognize text offline. Missing runtime models produce an error and require restoring the complete package. Initial use may copy bundled models into a writable cache, requiring additional disk space.
 
 If no executable release is available, build from source.
 
@@ -663,7 +821,9 @@ Development tool: **Visual Studio Community 2022**. Version **17.13.5** was used
 
 The source distribution should include the solution, project files, C# files, `.resx` files, and referenced resources—not only pasted code text.
 
-Test release packages outside the development output folder and preferably on Windows without Visual Studio installed. Do not assume the EXE alone includes all required dependencies.
+To build OCR, also run `PaddleOCR/build_ocr_exe.cmd` from the source package. It uses Python 3.10 x64 to prepare dependencies and language models and build the OCR executable. Wait for `BUILD AND FROZEN SELF-TEST PASSED`, then copy the entire generated `dist/ClipEditorOCR` folder beside the main application and rename it to `PaddleOCR`. Building requires internet access; customers do not need Python or the developer's `.venv` folder. Rebuild both the main application and OCR engine when updating the resident OCR protocol.
+
+Test release packages outside the development output folder and preferably on Windows without Visual Studio or Python installed. Do not assume the EXE alone includes all required dependencies.
 
 ### Preferences and privacy
 
@@ -673,16 +833,16 @@ Preferences are stored under the current user's registry key:
 HKEY_CURRENT_USER\Software\Alright Peaches Studio\ClipEditor
 ```
 
-Values: `UiLanguage`, `ProcessingMode`, and `ClipboardWatchMode`. These settings do not store editor text or history entries.
+Values include `UiLanguage`, `ProcessingMode`, `ClipboardWatchMode`, and `OcrLanguage`. These settings do not store editor text or history entries.
 
-The current text-processing implementation runs locally and does not provide text uploads or cloud history. The developer-apps button opens the Steam page linked below in your default browser; the browser and Steam handle data under their own rules.
+Text processing and OCR run locally without text uploads or cloud history, and screenshots do not need to be uploaded to an online OCR service. OCR uses local temporary image files and may copy models into a writable cache; this is separate from the in-memory text history. The developer-apps button opens the Steam page linked below in your default browser; the browser and Steam handle data under their own rules.
 
 The actual developer-apps URL follows the interface language: Simplified Chinese opens the Simplified Chinese Steam search page, while English keeps the original English search page. The Latest version button opens the ClipEditor GitHub page in the default browser.
 
 Please remember:
 
 - Clipboard content may contain passwords or personal information, especially during live monitoring.
-- Direct processing overwrites existing clipboard content.
+- Direct and Automatic processing write results back to the clipboard. Successful clipboard-image OCR also replaces the image with text, including in Normal mode.
 - Deleting entries, exceeding the history limit, or exiting the application can remove access to text held by this app.
 - No secure-erasure guarantee is provided. Text may still exist in Windows clipboard history, paging files, or other applications.
 - Keep original copies of important documents, code, or data and review transformation results.
@@ -691,7 +851,7 @@ Please remember:
 
 Use this repository's **Issues** to report problems and **Pull Requests** to propose improvements.
 
-Include the Windows version, display scaling, application version, selected modes, reproduction steps, and a sanitized sample.
+Include the Windows version, display scaling, application version, selected modes, reproduction steps, and a sanitized text or image sample. For OCR issues, also include the recognition language, Fast/High accuracy selection, and status message.
 
 Do not post real passwords, keys, or private clipboard content in public reports, screenshots, or logs.
 

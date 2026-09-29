@@ -135,6 +135,7 @@ namespace ClipEditor
         public Form1()
         {
             InitializeComponent();
+            InitializeOcrControls();
             RegisterWindowDragHandlers(this);
         }
 
@@ -925,6 +926,10 @@ namespace ClipEditor
             {
                 return;
             }
+
+            uint sequence = GetClipboardSequenceNumber();
+            if (sequence != 0 && sequence == programmaticClipboardSequenceNumber) return;
+            if (TryStartClipboardOcr(false, true)) return;
 
             if (automaticProcessingModeRadioButton.Checked &&
                 lockedAutomaticProcessingSteps.Count > 0)
@@ -1931,6 +1936,7 @@ namespace ClipEditor
         {
             try
             {
+                if (TryStartClipboardOcr(showSuccessMessage, !focusEditor)) return true;
                 string clipboardText = ExecuteClipboardOperation(
                     () => Clipboard.ContainsText()
                         ? Clipboard.GetText(TextDataFormat.UnicodeText)
@@ -2327,6 +2333,7 @@ namespace ClipEditor
 
         private void ApplyLanguage()
         {
+            UpdateOcrLanguage();
             timer1.Stop();
             this.Text = GetIdleWindowTitle();
 
@@ -2901,6 +2908,556 @@ namespace ClipEditor
 
             outputLines.Add(paragraph.ToString());
             paragraph.Clear();
+        }
+        // OCR uses a bundled local executable; no global hotkeys are registered.
+        private Button ocrCaptureButton;
+        private ComboBox ocrLanguageBox;
+        private bool ocrBusy;
+        private bool ocrClosing;
+        private uint lastOcrImageSequence;
+        private readonly object ocrProcessLock = new object();
+        private OcrSession ocrSession;
+        private volatile bool ocrCancelled;
+        private volatile string ocrStage = "STARTING";
+        private Label ocrStatusLabel;
+        private ProgressBar ocrProgress;
+        private Button ocrCancelButton;
+        private ComboBox ocrProfileBox;
+        private System.Windows.Forms.Timer ocrStatusTimer;
+        private readonly Stopwatch ocrElapsed = new Stopwatch();
+
+        private void InitializeOcrControls()
+        {
+            ocrCaptureButton = new Button { AutoSize = true, MinimumSize = new Size(130, 30) };
+            ocrCaptureButton.Click += (s, e) => BeginCaptureOcr();
+            ocrLanguageBox = new ComboBox { Width = 220, DropDownStyle = ComboBoxStyle.DropDown };
+            ocrLanguageBox.Items.AddRange(new object[] {
+                "ch | 简繁中文 / English / 日本語", "en | English", "korean | 한국어",
+                "fr | Français", "de | Deutsch", "es | Español", "it | Italiano",
+                "pt | Português", "nl | Nederlands", "pl | Polski", "ru | Русский",
+                "uk | Українська", "ka | ქართული", "el | Ελληνικά", "th | ไทย",
+                "vi | Tiếng Việt", "id | Indonesia", "ms | Melayu", "ar | العربية",
+                "fa | فارسی", "hi | हिन्दी", "ta | தமிழ்", "te | తెలుగు", "tr | Türkçe" });
+            ocrLanguageBox.Text = "ch | 简繁中文 / English / 日本語";
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath))
+                {
+                    string saved = key == null ? null : key.GetValue("OcrLanguage") as string;
+                    if (!string.IsNullOrWhiteSpace(saved)) ocrLanguageBox.Text = saved;
+                }
+            }
+            catch (Exception) { /* OCR still works without a saved preference. */ }
+            ocrLanguageBox.TextChanged += (s, e) => {
+                try { using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath))
+                    if (key != null) key.SetValue("OcrLanguage", ocrLanguageBox.Text); }
+                catch (Exception) { }
+            };
+            clipboardPanel.Controls.Add(ocrCaptureButton);
+            clipboardPanel.Controls.SetChildIndex(ocrCaptureButton, 0);
+            clipboardPanel.Controls.Add(ocrLanguageBox);
+            clipboardPanel.Controls.SetChildIndex(ocrLanguageBox, 1);
+            ocrProfileBox = new ComboBox { Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
+            ocrProfileBox.Items.AddRange(new object[] { "快速 / Fast", "高精度 / High accuracy" });
+            ocrProfileBox.SelectedIndex = 0;
+            clipboardPanel.Controls.Add(ocrProfileBox);
+            clipboardPanel.Controls.SetChildIndex(ocrProfileBox, 2);
+            FlowLayoutPanel status = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
+            ocrStatusLabel = new Label { AutoSize = true, ForeColor = Color.DarkBlue, Margin = new Padding(3, 6, 10, 3) };
+            ocrProgress = new ProgressBar { Width = 120, Height = 20, Style = ProgressBarStyle.Marquee, Visible = false };
+            ocrCancelButton = new Button { AutoSize = true, Visible = false };
+            ocrCancelButton.Click += (sender, args) =>
+            {
+                ocrCancelled = true;
+                ocrStage = "CANCELLING";
+                ocrCancelButton.Enabled = false;
+                StopOcrEngine();
+            };
+            status.Controls.Add(ocrStatusLabel);
+            status.Controls.Add(ocrProgress);
+            status.Controls.Add(ocrCancelButton);
+            rootLayout.SuspendLayout();
+            rootLayout.RowCount++;
+            foreach (Control control in rootLayout.Controls)
+            {
+                int row = rootLayout.GetRow(control);
+                if (row >= 1) rootLayout.SetRow(control, row + 1);
+            }
+            rootLayout.RowStyles.Insert(1, new RowStyle(SizeType.AutoSize));
+            rootLayout.Controls.Add(status, 0, 1);
+            rootLayout.ResumeLayout(true);
+            ocrStatusTimer = new System.Windows.Forms.Timer(components) { Interval = 200 };
+            ocrStatusTimer.Tick += (sender, args) => RefreshOcrProgress();
+            UpdateOcrLanguage();
+        }
+
+        private void RefreshOcrProgress()
+        {
+            string stage = ocrStage == "RECOGNIZING" ? Localize("正在识别", "Recognizing") :
+                ocrStage == "LOADING" ? Localize("正在加载模型", "Loading model") :
+                ocrStage == "CANCELLING" ? Localize("正在取消", "Cancelling") :
+                Localize("正在启动本地引擎", "Starting local engine");
+            ocrStatusLabel.Text = stage + "… " + ocrElapsed.Elapsed.TotalSeconds.ToString("0.0") + " s";
+        }
+
+        private void UpdateOcrLanguage()
+        {
+            if (ocrCaptureButton == null) return;
+            if (ocrStatusLabel != null && !ocrBusy) ocrStatusLabel.Text = Localize("OCR 就绪 · 本地识别", "OCR ready · Local recognition");
+            if (ocrCancelButton != null) ocrCancelButton.Text = Localize("取消识别", "Cancel OCR");
+            ocrCaptureButton.Text = Localize("OCR 截图 (F5–F8)", "OCR capture (F5–F8)");
+            toolTip1.SetToolTip(ocrCaptureButton, Localize(
+                "窗口内按 F5/F6/F7/F8，拖动框选；Esc 或右键取消。",
+                "Press F5/F6/F7/F8 in this app, then drag a region. Esc/right-click cancels."));
+            toolTip1.SetToolTip(ocrLanguageBox, Localize(
+                "选择已随程序打包的 OCR 语言；模型在本地加载。",
+                "Select a bundled OCR language; models load locally."));
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F5 || keyData == Keys.F6 || keyData == Keys.F7 || keyData == Keys.F8)
+            {
+                if (!ocrBusy) ocrCaptureButton.PerformClick();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            ocrClosing = true;
+            ocrCancelled = true;
+            if (ocrStatusTimer != null) ocrStatusTimer.Stop();
+            StopOcrEngine();
+            base.OnFormClosed(e);
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
+        private void BeginCaptureOcr()
+        {
+            if (ocrBusy || ocrClosing) return;
+            ocrBusy = true;
+            ocrCaptureButton.Enabled = false;
+            Hide();
+            // Use a WinForms timer so capture stays on the UI thread without blocking it.
+            System.Windows.Forms.Timer captureTimer = new System.Windows.Forms.Timer(components);
+            captureTimer.Interval = 250;
+            captureTimer.Tick += (sender, args) =>
+            {
+                captureTimer.Stop();
+                captureTimer.Dispose();
+                if (!ocrClosing && !IsDisposed) CaptureOcrAfterDelay();
+            };
+            captureTimer.Start();
+        }
+
+        private void CaptureOcrAfterDelay()
+        {
+            Bitmap crop = null;
+            try
+            {
+                if (ocrClosing) return;
+                IntPtr previousDpi = IntPtr.Zero;
+                try
+                {
+                    try { previousDpi = SetThreadDpiAwarenessContext(new IntPtr(-4)); }
+                    catch (EntryPointNotFoundException) { }
+                    Rectangle desktop = SystemInformation.VirtualScreen;
+                    using (Bitmap screen = new Bitmap(desktop.Width, desktop.Height))
+                    {
+                        using (Graphics g = Graphics.FromImage(screen))
+                            g.CopyFromScreen(desktop.Location, Point.Empty, desktop.Size);
+                        using (OcrSelectionForm overlay = new OcrSelectionForm(screen, desktop))
+                        {
+                            if (overlay.ShowDialog() == DialogResult.OK)
+                                crop = screen.Clone(overlay.Selection, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+                        }
+                    }
+                }
+                finally { if (previousDpi != IntPtr.Zero) SetThreadDpiAwarenessContext(previousDpi); }
+            }
+            catch (Exception ex) { if (!ocrClosing) MessageBox.Show(ex.Message, "OCR"); }
+            finally
+            {
+                if (!ocrClosing) { Show(); Activate(); }
+                ocrBusy = false;
+                if (!ocrClosing) ocrCaptureButton.Enabled = true;
+            }
+            if (crop != null) BeginRecognizeOcr(crop, false, GetClipboardSequenceNumber(), false);
+            else if (!ocrClosing && liveClipboardRadioButton.Checked) clipboardUpdateTimer.Start();
+        }
+
+        // Returns true for an image even while busy, so image data never clears the editor.
+        private bool TryStartClipboardOcr(bool explicitRequest, bool fromMonitor)
+        {
+            try
+            {
+                uint sequence = GetClipboardSequenceNumber();
+                Bitmap image = ExecuteClipboardOperation(() => {
+                    if (!Clipboard.ContainsImage()) return null;
+                    using (Image original = Clipboard.GetImage())
+                        return original == null ? null : new Bitmap(original);
+                });
+                if (image == null) return false;
+                if (ocrBusy || (!explicitRequest && sequence == lastOcrImageSequence))
+                { image.Dispose(); return true; }
+                if (sequence != GetClipboardSequenceNumber())
+                { image.Dispose(); clipboardUpdateTimer.Start(); return true; }
+                lastOcrImageSequence = sequence;
+                ocrBusy = true;
+                QueueClipboardOcr(image, sequence, fromMonitor);
+                return true;
+            }
+            catch (ExternalException)
+            {
+                if (liveClipboardRadioButton.Checked) clipboardUpdateTimer.Start();
+                return true;
+            }
+        }
+
+        private void QueueClipboardOcr(Bitmap image, uint sequence, bool fromMonitor)
+        {
+            // Post after startup/history initialization and mode events have completed.
+            try
+            {
+                BeginInvoke(new MethodInvoker(delegate
+                {
+                    if (ocrClosing || IsDisposed) { image.Dispose(); return; }
+                    BeginRecognizeOcr(image, true, sequence, fromMonitor);
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+                image.Dispose();
+                ocrBusy = false;
+            }
+        }
+
+        private void ReportOcrError(Exception error, bool fromMonitor)
+        {
+            if (ocrClosing || IsDisposed) return;
+            if (error is OperationCanceledException || ocrCancelled)
+            {
+                ocrStatusLabel.Text = Localize("OCR 已取消", "OCR cancelled");
+                return;
+            }
+            ocrStatusLabel.Text = Localize("OCR 失败：", "OCR failed: ") + error.Message;
+            ShowStatus(ocrStatusLabel.Text);
+            if (!fromMonitor)
+                MessageBox.Show(this, error.Message, "OCR", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void FinishOcr(Bitmap image, string folder, uint sequence)
+        {
+            image.Dispose();
+            try { if (System.IO.Directory.Exists(folder)) System.IO.Directory.Delete(folder, true); }
+            catch (Exception) { }
+            ocrBusy = false;
+            if (!ocrClosing && !IsDisposed)
+            {
+                ocrCaptureButton.Enabled = true;
+                ocrStatusTimer.Stop();
+                ocrElapsed.Stop();
+                ocrProgress.Visible = false;
+                ocrCancelButton.Visible = false;
+                ocrProfileBox.Enabled = true;
+                ocrLanguageBox.Enabled = true;
+                uint current = GetClipboardSequenceNumber();
+                if (liveClipboardRadioButton.Checked && current != sequence && current != programmaticClipboardSequenceNumber)
+                    clipboardUpdateTimer.Start();
+            }
+        }
+
+        private void BeginRecognizeOcr(Bitmap image, bool fromClipboard, uint sequence, bool fromMonitor)
+        {
+            ocrBusy = true;
+            ocrCancelled = false;
+            ocrStage = "STARTING";
+            ocrElapsed.Restart();
+            ocrProgress.Visible = true;
+            ocrCancelButton.Visible = true;
+            ocrCancelButton.Enabled = true;
+            ocrProfileBox.Enabled = false;
+            ocrLanguageBox.Enabled = false;
+            ocrStatusTimer.Start();
+            RefreshOcrProgress();
+            ocrCaptureButton.Enabled = false;
+            string profile = ocrProfileBox.SelectedIndex == 1 ? "high" : "fast";
+            string language = ocrLanguageBox.Text.Split('|')[0].Trim();
+            string editorBefore = textBox1.Text;
+            TabPage tabBefore = historyTabControl.SelectedTab;
+            bool automatic = automaticProcessingModeRadioButton.Checked;
+            bool direct = directClipboardModeRadioButton.Checked;
+            AutomaticProcessingStep[] steps = lockedAutomaticProcessingSteps.ToArray();
+            string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ClipEditorOCR-" + Guid.NewGuid().ToString("N"));
+            System.ComponentModel.BackgroundWorker worker = new System.ComponentModel.BackgroundWorker();
+            try
+            {
+                if (!Regex.IsMatch(language, @"^[a-zA-Z_]{2,24}$"))
+                    throw new InvalidOperationException(Localize("请选择有效的 OCR 语言代码。", "Choose a valid OCR language code."));
+                System.IO.Directory.CreateDirectory(folder);
+                string input = System.IO.Path.Combine(folder, "capture.png");
+                string output = System.IO.Path.Combine(folder, "result.txt");
+                image.Save(input, System.Drawing.Imaging.ImageFormat.Png);
+                ShowStatus(Localize("OCR 识别中；首次加载模型可能较慢…", "OCR running; first model load may take a while…"));
+                worker.DoWork += (sender, args) =>
+                {
+                    // No control or clipboard access on this worker thread.
+                    args.Result = RunPaddleOcr(input, output, language, profile);
+                };
+                worker.RunWorkerCompleted += (sender, args) =>
+                {
+                    // BackgroundWorker posts this completion back to the WinForms UI thread.
+                    try
+                    {
+                        if (ocrCancelled) throw new OperationCanceledException();
+                        if (args.Error != null) throw args.Error;
+                        if (args.Cancelled) return;
+                        string result = (string)args.Result;
+                        if (ocrClosing || IsDisposed) return;
+                        // Do not overwrite newer copies, edits, history selections or a newly selected mode.
+                        if (sequence != GetClipboardSequenceNumber() || editorBefore != textBox1.Text ||
+                            tabBefore != historyTabControl.SelectedTab ||
+                            automatic != automaticProcessingModeRadioButton.Checked || direct != directClipboardModeRadioButton.Checked ||
+                            (automatic && !steps.SequenceEqual(lockedAutomaticProcessingSteps)) ||
+                            (fromMonitor && !liveClipboardRadioButton.Checked))
+                        {
+                            ocrStatusLabel.Text = Localize("OCR 结果已过期，保留较新内容", "OCR result discarded; newer content retained");
+                            ShowStatus(ocrStatusLabel.Text);
+                            return;
+                        }
+                        if (string.IsNullOrWhiteSpace(result))
+                        { ocrStatusLabel.Text = Localize("OCR 未识别到文字，原内容保留。", "OCR found no text; existing content retained."); ShowStatus(ocrStatusLabel.Text); return; }
+                        result = NormalizeLineEndings(result);
+                        if (automatic)
+                            foreach (AutomaticProcessingStep step in steps)
+                                result = NormalizeLineEndings(step.ProcessingAction(result));
+                        LoadClipboardTextIntoHistory(result, true);
+                        if (fromClipboard || automatic || direct)
+                        {
+                            if (!TrySynchronizeClipboard(result)) { ocrStatusLabel.Text = Localize("识别完成，但写回剪贴板失败", "OCR complete; clipboard write failed"); return; }
+                        }
+                        ocrStatusLabel.Text = Localize("OCR 已完成，用时 ", "OCR complete in ") + ocrElapsed.Elapsed.TotalSeconds.ToString("0.0") + " s";
+                        ShowStatus(ocrStatusLabel.Text);
+                    }
+                    catch (Exception ex) { ReportOcrError(ex, fromMonitor); }
+                    finally
+                    {
+                        FinishOcr(image, folder, sequence);
+                        worker.Dispose();
+                    }
+                };
+                worker.RunWorkerAsync();
+            }
+            catch (Exception ex)
+            {
+                ReportOcrError(ex, fromMonitor);
+                FinishOcr(image, folder, sequence);
+                worker.Dispose();
+            }
+        }
+
+        private sealed class OcrSession
+        {
+            public Process Process;
+            public readonly Queue<string> Lines = new Queue<string>();
+            public readonly StringBuilder Errors = new StringBuilder();
+            public bool Ready;
+        }
+
+        private void StopOcrEngine()
+        {
+            lock (ocrProcessLock)
+            {
+                OcrSession session = ocrSession;
+                ocrSession = null;
+                if (session == null) return;
+                try { if (!session.Process.HasExited) session.Process.Kill(); } catch (Exception) { }
+                session.Process.Dispose();
+                lock (session.Lines) { Monitor.PulseAll(session.Lines); }
+            }
+        }
+
+        private OcrSession GetOcrSession()
+        {
+            lock (ocrProcessLock)
+            {
+                if (ocrClosing || ocrCancelled) throw new OperationCanceledException();
+                if (ocrSession != null)
+                {
+                    if (!ocrSession.Process.HasExited) return ocrSession;
+                    ocrSession.Process.Dispose();
+                    ocrSession = null;
+                }
+                string root = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PaddleOCR");
+                string executable = System.IO.Path.Combine(root, "ClipEditorOCR.exe");
+                if (!System.IO.File.Exists(executable))
+                    throw new System.IO.FileNotFoundException("Missing PaddleOCR\\ClipEditorOCR.exe. Copy the complete OCR release folder beside ClipEditor.exe.");
+                if (!System.IO.File.Exists(System.IO.Path.Combine(root, "model_manifest.json")))
+                    throw new System.IO.FileNotFoundException(Localize(
+                        "请用新版脚本重新打包 OCR，并替换整个 PaddleOCR 文件夹；缺少 model_manifest.json。",
+                        "Rebuild OCR with the new scripts and replace the whole PaddleOCR folder; model_manifest.json is missing."));
+                ProcessStartInfo info = new ProcessStartInfo {
+                    FileName = executable, Arguments = "--serve", WorkingDirectory = root,
+                    UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+                };
+                info.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                info.EnvironmentVariables["DISABLE_MODEL_SOURCE_CHECK"] = "True";
+                info.EnvironmentVariables["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True";
+                OcrSession session = new OcrSession { Process = new Process { StartInfo = info } };
+                session.Process.OutputDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null || !args.Data.StartsWith("CEOCR1\t", StringComparison.Ordinal)) return;
+                    lock (session.Lines) { session.Lines.Enqueue(args.Data); Monitor.PulseAll(session.Lines); }
+                };
+                session.Process.ErrorDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null) return;
+                    lock (session.Errors)
+                    {
+                        session.Errors.AppendLine(args.Data);
+                        if (session.Errors.Length > 2500) session.Errors.Remove(0, session.Errors.Length - 2500);
+                    }
+                };
+                try
+                {
+                    session.Process.Start();
+                    session.Process.BeginOutputReadLine();
+                    session.Process.BeginErrorReadLine();
+                    ocrSession = session;
+                    return session;
+                }
+                catch
+                {
+                    try { if (!session.Process.HasExited) session.Process.Kill(); } catch (Exception) { }
+                    session.Process.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        private string[] ReadOcrMessage(OcrSession session, Stopwatch timeout)
+        {
+            while (true)
+            {
+                if (ocrCancelled || ocrClosing) throw new OperationCanceledException();
+                if (timeout.Elapsed.TotalMinutes > 10) throw new TimeoutException("OCR timed out after 10 minutes.");
+                lock (session.Lines)
+                {
+                    if (session.Lines.Count > 0) return session.Lines.Dequeue().Split('\t');
+                    Monitor.Wait(session.Lines, 100);
+                }
+                if (ocrCancelled || ocrClosing) throw new OperationCanceledException();
+                if (session.Process.HasExited)
+                {
+                    session.Process.WaitForExit();
+                    // Drain messages delivered just before process exit before reporting its failure.
+                    lock (session.Lines)
+                    {
+                        if (session.Lines.Count > 0) return session.Lines.Dequeue().Split('\t');
+                    }
+                    lock (session.Errors) { throw new InvalidOperationException("OCR process exited. " + session.Errors.ToString()); }
+                }
+            }
+        }
+
+        private string RunPaddleOcr(string input, string output, string language, string profile)
+        {
+            try
+            {
+                OcrSession session = GetOcrSession();
+                Stopwatch timeout = Stopwatch.StartNew();
+                while (!session.Ready)
+                {
+                    string[] ready = ReadOcrMessage(session, timeout);
+                    if (ready.Length >= 3 && ready[1] == "0" && ready[2] == "READY") session.Ready = true;
+                }
+                if (ocrCancelled || ocrClosing) throw new OperationCanceledException();
+                string job = Guid.NewGuid().ToString("N");
+                string request = "OCR\t" + job + "\t" + language + "\t" + profile + "\t" +
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(input)) + "\t" +
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(output));
+                ocrStage = "LOADING";
+                session.Process.StandardInput.WriteLine(request);
+                session.Process.StandardInput.Flush();
+                while (true)
+                {
+                    string[] reply = ReadOcrMessage(session, timeout);
+                    if (reply.Length < 3 || reply[1] != job) continue;
+                    if (reply[2] == "LOADING" || reply[2] == "RECOGNIZING") { ocrStage = reply[2]; continue; }
+                    if (reply[2] == "OK") return System.IO.File.ReadAllText(output, Encoding.UTF8);
+                    if (reply[2] == "ERROR")
+                        throw new InvalidOperationException(reply.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(reply[3])) : "OCR error");
+                }
+            }
+            catch
+            {
+                StopOcrEngine();
+                if (ocrCancelled || ocrClosing) throw new OperationCanceledException();
+                throw;
+            }
+        }
+
+        private sealed class OcrSelectionForm : Form
+        {
+            private readonly Bitmap screenshot;
+            private Point start;
+            private bool selecting;
+            public Rectangle Selection { get; private set; }
+            public OcrSelectionForm(Bitmap screenshot, Rectangle bounds)
+            {
+                this.screenshot = screenshot;
+                AutoScaleMode = AutoScaleMode.None;
+                FormBorderStyle = FormBorderStyle.None;
+                StartPosition = FormStartPosition.Manual;
+                Bounds = bounds;
+                TopMost = true;
+                ShowInTaskbar = false;
+                DoubleBuffered = true;
+                KeyPreview = true;
+                Cursor = Cursors.Cross;
+            }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                e.Graphics.DrawImageUnscaled(screenshot, 0, 0);
+                using (Brush dim = new SolidBrush(Color.FromArgb(100, Color.Black)))
+                    e.Graphics.FillRectangle(dim, ClientRectangle);
+                if (Selection.Width > 0 && Selection.Height > 0)
+                {
+                    e.Graphics.DrawImage(screenshot, Selection, Selection, GraphicsUnit.Pixel);
+                    using (Pen border = new Pen(Color.DeepSkyBlue, 2)) e.Graphics.DrawRectangle(border, Selection);
+                }
+            }
+            protected override void OnMouseDown(MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Right) { DialogResult = DialogResult.Cancel; return; }
+                if (e.Button != MouseButtons.Left) return;
+                start = e.Location; selecting = true; Capture = true;
+            }
+            private void SetSelection(Point end)
+            {
+                Selection = Rectangle.Intersect(ClientRectangle, Rectangle.FromLTRB(
+                    Math.Min(start.X, end.X), Math.Min(start.Y, end.Y), Math.Max(start.X, end.X), Math.Max(start.Y, end.Y)));
+                Invalidate();
+            }
+            protected override void OnMouseMove(MouseEventArgs e)
+            { if (selecting) SetSelection(e.Location); }
+            protected override void OnMouseUp(MouseEventArgs e)
+            {
+                if (!selecting || e.Button != MouseButtons.Left) return;
+                SetSelection(e.Location); selecting = false; Capture = false;
+                if (Selection.Width >= 3 && Selection.Height >= 3) DialogResult = DialogResult.OK;
+            }
+            protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+            {
+                if (keyData == Keys.Escape) { DialogResult = DialogResult.Cancel; return true; }
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
         }
     }
 }
