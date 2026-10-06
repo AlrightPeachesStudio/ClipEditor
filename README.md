@@ -1,4 +1,6 @@
-# ClipEditor
+# ClipEditor 
+
+## [Go to English Introduction](#english)
 
 ## 简体中文简介
 
