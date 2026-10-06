@@ -12,6 +12,8 @@ Made by **Alright Peaches Studio**
 
 [开发者Alright Peaches Studio的其它软件和应用](https://store.steampowered.com/search/?l=schinese&term=Alright+Peaches+Studio)
 
+[Also can be downloaded in Baidu百度 Pan](https://pan.baidu.com/s/17oPOAsueolcDaDSuXN09dw?pwd=6899)
+
 ### 软件简介
 
 ClipEditor 是使用 C# 和 Windows Forms 开发的 Windows 桌面工具，可提取剪贴板纯文本、识别截图和剪贴板图片中的文字，并在粘贴前完成编辑、替换与格式整理。文字识别使用本地 PaddleOCR 引擎，完整发行包无需客户安装 Python。
