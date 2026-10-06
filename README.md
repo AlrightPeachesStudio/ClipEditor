@@ -85,8 +85,9 @@ OCR 默认使用快速模式。识别其他语言时选择相应的 OCR 语言�
 
 适合提取软件界面、网页图片、扫描文档当前显示区域中的文字。
 
-- 点击左侧的 OCR 截图按钮，拖动鼠标框选需要识别的屏幕区域。
-- ClipEditor 窗口处于活动状态时，按 `F5`、`F6`、`F7` 或 `F8` 均可启动同一个截图功能。
+- 直接使用PrtScr或别的软件截图，然后打开本软件，剪切板中图片里的文字就直接被扣出来了。
+- 或点击左侧的 OCR 截图按钮，拖动鼠标框选需要识别的屏幕区域。
+- 或在ClipEditor 窗口处于活动状态时，按 `F5`、`F6`、`F7` 或 `F8` 均可启动同一个截图功能。
 - 四个按键的作用相同，不分别对应不同语言或识别模式。
 - 框选时按 `Esc` 或点击鼠标右键，可取消截图。
 - 完成框选后，程序调用本地 OCR 引擎识别，并将文字载入文本框和临时历史标签。
@@ -530,8 +531,9 @@ Without live monitoring, use the existing clipboard import button to recognize a
 
 Use it for application interfaces, webpage images, or the visible area of a scanned document.
 
-- Click the OCR screenshot button on the left and drag to select a screen region.
-- While ClipEditor is the active window, press `F5`, `F6`, `F7`, or `F8` to start the same capture function.
+- Simply take a screenshot using PrtScr or another program, then open this software, and the text from the image in the clipboard will be automatically extracted.
+- Or click the OCR screenshot button on the left and drag to select a screen region.
+- Or when ClipEditor is the active window, press `F5`, `F6`, `F7`, or `F8` to start the same capture function.
 - All four keys perform the same action; they do not select different languages or recognition profiles.
 - Press `Esc` or right-click during selection to cancel the capture.
 - After selection, the local engine recognizes the image and loads its text into the editor and temporary history.
